@@ -1,0 +1,1 @@
+make -j3 && make test

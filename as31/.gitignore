@@ -1,0 +1,5 @@
+*.o
+as31
+as31_gtk
+parser.c
+parser.h
