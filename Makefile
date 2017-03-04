@@ -7,7 +7,7 @@ $(ASM):
 	make -C as31
 
 $(EMU):
-	make -f emu8051
+	make -C emu8051
 
 %.hex: %.asm $(AS31)
 	$(ASM) $<
