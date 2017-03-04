@@ -1,5 +1,6 @@
-# 8051forth
-Forth for the 8051
+# 8051forth - Forth for the 8051
+
+[![Build Status](https://travis-ci.org/jamesbowman/8051forth.svg?branch=master)](https://travis-ci.org/jamesbowman/8051forth)
 
 To rebuild:
 
