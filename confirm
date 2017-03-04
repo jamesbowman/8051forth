@@ -1,0 +1,13 @@
+set -e
+
+# Usage <cputype> <hexfile>
+#
+# Runs the ANS test suite on the specified HEXFILE, emulating
+# the given CPUTYPE.
+# Confirms that the output matches a "golden" version.
+#
+
+cat core.fs runtests.fs core.fr |
+emu8051/emu $1 $2 > actual
+diff actual golden
+rm actual

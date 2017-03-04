@@ -1,4 +1,5 @@
 : ALIGN ;
+: ALIGNED ;
 
 : CHARS ;
 : CHAR+ 1+ ;

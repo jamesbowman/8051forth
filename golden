@@ -1,0 +1,2098 @@
+8051 CamelForth v1.6  18 Aug 1999
+: ALIGN ; ok
+: ALIGNED ; ok
+ ok
+: CHARS ; ok
+: CHAR+ 1+ ; ok
+ ok
+: CELLS 2* ; ok
+: CELL+ 2 + ; ok
+\ #noverbose ok
+\ ANS Forth tests - run all tests ok
+ ok
+\ Adjust the file paths as appropriate to your system ok
+\ Select the appropriate test harness, either the simple tester.fr ok
+\ or the more complex ttester.fs  ok
+ ok
+\ From: John Hayes S1I ok
+\ Subject: tester.fr ok
+\ Date: Mon, 27 Nov 95 13:10:09 PST   ok
+ ok
+\ (C) 1995 JOHNS HOPKINS UNIVERSITY / APPLIED PHYSICS LABORATORY ok
+\ MAY BE DISTRIBUTED FREELY AS LONG AS THIS COPYRIGHT NOTICE REMAINS. ok
+\ VERSION 1.2 ok
+ ok
+\ 31/3/2015 Variable #ERRORS added and incremented for each error reported. ok
+\ 22/1/09 The words { and } have been changed to T{ and }T respectively to ok
+\ agree with the Forth 200X file ttester.fs. This avoids clashes with ok
+\ locals using { ... } and the FSL use of }  ok
+ ok
+HEX ok
+ ok
+: ERROR         \ ( C-ADDR U -- ) DISPLAY AN ERROR MESSAGE FOLLOWED BY 
+                \ THE LINE THAT HAD THE ERROR. 
+   CR TYPE CR SOURCE TYPE          \ DISPLAY LINE CORRESPONDING TO ERROR 
+   \ CR .S 
+   CR BEGIN AGAIN 
+; ok
+ ok
+VARIABLE ACTUAL-DEPTH                   \ STACK RECORD ok
+CREATE ACTUAL-RESULTS 20 CELLS ALLOT ok
+ ok
+: T{            \ ( -- ) SYNTACTIC SUGAR. 
+   ; ok
+ ok
+: ->            \ ( ... -- ) RECORD DEPTH AND CONTENT OF STACK. 
+   DEPTH DUP ACTUAL-DEPTH !             \ RECORD DEPTH 
+   ?DUP IF                              \ IF THERE IS SOMETHING ON STACK 
+      0 DO ACTUAL-RESULTS I CELLS + ! LOOP \ SAVE THEM 
+   THEN ; ok
+ ok
+: }T            \ ( ... -- ) COMPARE STACK (EXPECTED) CONTENTS WITH SAVED 
+      \ (ACTUAL) CONTENTS. 
+   DEPTH ACTUAL-DEPTH @ = IF            \ IF DEPTHS MATCH 
+      DEPTH ?DUP IF                     \ IF THERE IS SOMETHING ON THE STACK 
+         0  DO                          \ FOR EACH STACK ITEM 
+                ACTUAL-RESULTS I CELLS + @      \ COMPARE ACTUAL WITH EXPECTED 
+                <> IF S" values " ERROR THEN 
+         LOOP 
+      THEN 
+   ELSE                                 \ DEPTH MISMATCH 
+      S" RESULTS" ERROR 
+   THEN ; ok
+ ok
+: TESTING       \ ( -- ) TALKING COMMENT. 
+  SOURCE  
+   >IN ! DROP [CHAR] * EMIT 
+; ok
+\ From: John Hayes S1I ok
+ ok
+\ Subject: core.fr ok
+ ok
+\ Date: Mon, 27 Nov 95 13:10 ok
+ ok
+ ok
+ ok
+\ (C) 1995 JOHNS HOPKINS UNIVERSITY / APPLIED PHYSICS LABORATORY ok
+ ok
+\ MAY BE DISTRIBUTED FREELY AS LONG AS THIS COPYRIGHT NOTICE REMAINS. ok
+ ok
+\ VERSION 1.2 ok
+ ok
+\ THIS PROGRAM TESTS THE CORE WORDS OF AN ANS FORTH SYSTEM. ok
+ ok
+\ THE PROGRAM ASSUMES A TWO'S COMPLEMENT IMPLEMENTATION WHERE ok
+ ok
+\ THE RANGE OF SIGNED NUMBERS IS -2^(N-1) ... 2^(N-1)-1 AND ok
+ ok
+\ THE RANGE OF UNSIGNED NUMBERS IS 0 ... 2^(N)-1. ok
+ ok
+\ I HAVEN'T FIGURED OUT HOW TO TEST KEY, QUIT, ABORT, OR ABORT"... ok
+ ok
+\ I ALSO HAVEN'T THOUGHT OF A WAY TO TEST ENVIRONMENT?... ok
+ ok
+ ok
+ ok
+CR 
+ok
+ ok
+TESTING CORE WORDS *ok
+ ok
+HEX ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING BASIC ASSUMPTIONS *ok
+ ok
+ ok
+ ok
+T{ -> }T                                        \ START WITH CLEAN SLATE ok
+ ok
+( TEST IF ANY BITS ARE SET; ANSWER IN BASE 1 ) ok
+ ok
+T{ : BITSSET? IF 0 0 ELSE 0 THEN ; -> }T ok
+ ok
+T{  0 BITSSET? -> 0 }T          ( ZERO IS ALL BITS CLEAR ) ok
+ ok
+T{  1 BITSSET? -> 0 0 }T                ( OTHER NUMBER HAVE AT LEAST ONE BIT ) ok
+ ok
+T{ -1 BITSSET? -> 0 0 }T ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING BOOLEANS: INVERT AND OR XOR *ok
+ ok
+ ok
+ ok
+T{ 0 0 AND -> 0 }T ok
+ ok
+T{ 0 1 AND -> 0 }T ok
+ ok
+T{ 1 0 AND -> 0 }T ok
+ ok
+T{ 1 1 AND -> 1 }T ok
+ ok
+ ok
+ ok
+T{ 0 INVERT 1 AND -> 1 }T ok
+ ok
+T{ 1 INVERT 1 AND -> 0 }T ok
+ ok
+ ok
+ ok
+0        CONSTANT 0S ok
+ ok
+0 INVERT CONSTANT 1S ok
+ ok
+ ok
+ ok
+T{ 0S INVERT -> 1S }T ok
+ ok
+T{ 1S INVERT -> 0S }T ok
+ ok
+ ok
+ ok
+T{ 0S 0S AND -> 0S }T ok
+ ok
+T{ 0S 1S AND -> 0S }T ok
+ ok
+T{ 1S 0S AND -> 0S }T ok
+ ok
+T{ 1S 1S AND -> 1S }T ok
+ ok
+ ok
+ ok
+T{ 0S 0S OR -> 0S }T ok
+ ok
+T{ 0S 1S OR -> 1S }T ok
+ ok
+T{ 1S 0S OR -> 1S }T ok
+ ok
+T{ 1S 1S OR -> 1S }T ok
+ ok
+ ok
+ ok
+T{ 0S 0S XOR -> 0S }T ok
+ ok
+T{ 0S 1S XOR -> 1S }T ok
+ ok
+T{ 1S 0S XOR -> 1S }T ok
+ ok
+T{ 1S 1S XOR -> 0S }T ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING 2* 2/ LSHIFT RSHIFT *ok
+ ok
+ ok
+ ok
+( WE TRUST 1S, INVERT, AND BITSSET?; WE WILL CONFIRM RSHIFT LATER ) ok
+ ok
+1S 1 RSHIFT INVERT CONSTANT MSB ok
+ ok
+T{ MSB BITSSET? -> 0 0 }T ok
+ ok
+ ok
+ ok
+T{ 0S 2* -> 0S }T ok
+ ok
+T{ 1 2* -> 2 }T ok
+ ok
+T{ 4000 2* -> 8000 }T ok
+ ok
+T{ 1S 2* 1 XOR -> 1S }T ok
+ ok
+T{ MSB 2* -> 0S }T ok
+ ok
+ ok
+ ok
+T{ 0S 2/ -> 0S }T ok
+ ok
+T{ 1 2/ -> 0 }T ok
+ ok
+T{ 4000 2/ -> 2000 }T ok
+ ok
+T{ 1S 2/ -> 1S }T                               \ MSB PROPOGATED ok
+ ok
+T{ 1S 1 XOR 2/ -> 1S }T ok
+ ok
+T{ MSB 2/ MSB AND -> MSB }T ok
+ ok
+ ok
+ ok
+T{ 1 0 LSHIFT -> 1 }T ok
+ ok
+T{ 1 1 LSHIFT -> 2 }T ok
+ ok
+T{ 1 2 LSHIFT -> 4 }T ok
+ ok
+T{ 1 F LSHIFT -> 8000 }T                        \ BIGGEST GUARANTEED SHIFT ok
+ ok
+T{ 1S 1 LSHIFT 1 XOR -> 1S }T ok
+ ok
+T{ MSB 1 LSHIFT -> 0 }T ok
+ ok
+ ok
+ ok
+T{ 1 0 RSHIFT -> 1 }T ok
+ ok
+T{ 1 1 RSHIFT -> 0 }T ok
+ ok
+T{ 2 1 RSHIFT -> 1 }T ok
+ ok
+T{ 4 2 RSHIFT -> 1 }T ok
+ ok
+T{ 8000 F RSHIFT -> 1 }T                        \ BIGGEST ok
+ ok
+T{ MSB 1 RSHIFT MSB AND -> 0 }T         \ RSHIFT ZERO FILLS MSBS ok
+ ok
+T{ MSB 1 RSHIFT 2* -> MSB }T ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING COMPARISONS: 0= = 0< < > U< MIN MAX *ok
+ ok
+0 INVERT                        CONSTANT MAX-UINT ok
+ ok
+0 INVERT 1 RSHIFT               CONSTANT MAX-INT ok
+ ok
+0 INVERT 1 RSHIFT INVERT        CONSTANT MIN-INT ok
+ ok
+0 INVERT 1 RSHIFT               CONSTANT MID-UINT ok
+ ok
+0 INVERT 1 RSHIFT INVERT        CONSTANT MID-UINT+1 ok
+ ok
+ ok
+ ok
+0S CONSTANT <FALSE> ok
+ ok
+1S CONSTANT <TRUE> ok
+ ok
+ ok
+ ok
+T{ 0 0= -> <TRUE> }T ok
+ ok
+T{ 1 0= -> <FALSE> }T ok
+ ok
+T{ 2 0= -> <FALSE> }T ok
+ ok
+T{ -1 0= -> <FALSE> }T ok
+ ok
+T{ MAX-UINT 0= -> <FALSE> }T ok
+ ok
+T{ MIN-INT 0= -> <FALSE> }T ok
+ ok
+T{ MAX-INT 0= -> <FALSE> }T ok
+ ok
+ ok
+ ok
+T{ 0 0 = -> <TRUE> }T ok
+ ok
+T{ 1 1 = -> <TRUE> }T ok
+ ok
+T{ -1 -1 = -> <TRUE> }T ok
+ ok
+T{ 1 0 = -> <FALSE> }T ok
+ ok
+T{ -1 0 = -> <FALSE> }T ok
+ ok
+T{ 0 1 = -> <FALSE> }T ok
+ ok
+T{ 0 -1 = -> <FALSE> }T ok
+ ok
+ ok
+ ok
+T{ 0 0< -> <FALSE> }T ok
+ ok
+T{ -1 0< -> <TRUE> }T ok
+ ok
+T{ MIN-INT 0< -> <TRUE> }T ok
+ ok
+T{ 1 0< -> <FALSE> }T ok
+ ok
+T{ MAX-INT 0< -> <FALSE> }T ok
+ ok
+ ok
+ ok
+T{ 0 1 < -> <TRUE> }T ok
+ ok
+T{ 1 2 < -> <TRUE> }T ok
+ ok
+T{ -1 0 < -> <TRUE> }T ok
+ ok
+T{ -1 1 < -> <TRUE> }T ok
+ ok
+T{ MIN-INT 0 < -> <TRUE> }T ok
+ ok
+MIN-INT U. MAX-INT U. 8000 7FFF ok
+ ok
+T{ MIN-INT MAX-INT < -> <TRUE> }T ok
+ ok
+T{ 0 MAX-INT < -> <TRUE> }T ok
+ ok
+T{ 0 0 < -> <FALSE> }T ok
+ ok
+T{ 1 1 < -> <FALSE> }T ok
+ ok
+T{ 1 0 < -> <FALSE> }T ok
+ ok
+T{ 2 1 < -> <FALSE> }T ok
+ ok
+T{ 0 -1 < -> <FALSE> }T ok
+ ok
+T{ 1 -1 < -> <FALSE> }T ok
+ ok
+T{ 0 MIN-INT < -> <FALSE> }T ok
+ ok
+T{ MAX-INT MIN-INT < -> <FALSE> }T ok
+ ok
+T{ MAX-INT 0 < -> <FALSE> }T ok
+ ok
+ ok
+ ok
+T{ 0 1 > -> <FALSE> }T ok
+ ok
+T{ 1 2 > -> <FALSE> }T ok
+ ok
+T{ -1 0 > -> <FALSE> }T ok
+ ok
+T{ -1 1 > -> <FALSE> }T ok
+ ok
+T{ MIN-INT 0 > -> <FALSE> }T ok
+ ok
+T{ MIN-INT MAX-INT > -> <FALSE> }T ok
+ ok
+T{ 0 MAX-INT > -> <FALSE> }T ok
+ ok
+T{ 0 0 > -> <FALSE> }T ok
+ ok
+T{ 1 1 > -> <FALSE> }T ok
+ ok
+T{ 1 0 > -> <TRUE> }T ok
+ ok
+T{ 2 1 > -> <TRUE> }T ok
+ ok
+T{ 0 -1 > -> <TRUE> }T ok
+ ok
+T{ 1 -1 > -> <TRUE> }T ok
+ ok
+T{ 0 MIN-INT > -> <TRUE> }T ok
+ ok
+T{ MAX-INT MIN-INT > -> <TRUE> }T ok
+ ok
+T{ MAX-INT 0 > -> <TRUE> }T ok
+ ok
+ ok
+ ok
+T{ 0 1 U< -> <TRUE> }T ok
+ ok
+T{ 1 2 U< -> <TRUE> }T ok
+ ok
+T{ 0 MID-UINT U< -> <TRUE> }T ok
+ ok
+T{ 0 MAX-UINT U< -> <TRUE> }T ok
+ ok
+T{ MID-UINT MAX-UINT U< -> <TRUE> }T ok
+ ok
+T{ 0 0 U< -> <FALSE> }T ok
+ ok
+T{ 1 1 U< -> <FALSE> }T ok
+ ok
+T{ 1 0 U< -> <FALSE> }T ok
+ ok
+T{ 2 1 U< -> <FALSE> }T ok
+ ok
+T{ MID-UINT 0 U< -> <FALSE> }T ok
+ ok
+T{ MAX-UINT 0 U< -> <FALSE> }T ok
+ ok
+T{ MAX-UINT MID-UINT U< -> <FALSE> }T ok
+ ok
+ ok
+ ok
+T{ 0 1 MIN -> 0 }T ok
+ ok
+T{ 1 2 MIN -> 1 }T ok
+ ok
+T{ -1 0 MIN -> -1 }T ok
+ ok
+T{ -1 1 MIN -> -1 }T ok
+ ok
+T{ MIN-INT 0 MIN -> MIN-INT }T ok
+ ok
+T{ MIN-INT MAX-INT MIN -> MIN-INT }T ok
+ ok
+T{ 0 MAX-INT MIN -> 0 }T ok
+ ok
+T{ 0 0 MIN -> 0 }T ok
+ ok
+T{ 1 1 MIN -> 1 }T ok
+ ok
+T{ 1 0 MIN -> 0 }T ok
+ ok
+T{ 2 1 MIN -> 1 }T ok
+ ok
+T{ 0 -1 MIN -> -1 }T ok
+ ok
+T{ 1 -1 MIN -> -1 }T ok
+ ok
+T{ 0 MIN-INT MIN -> MIN-INT }T ok
+ ok
+T{ MAX-INT MIN-INT MIN -> MIN-INT }T ok
+ ok
+T{ MAX-INT 0 MIN -> 0 }T ok
+ ok
+ ok
+ ok
+T{ 0 1 MAX -> 1 }T ok
+ ok
+T{ 1 2 MAX -> 2 }T ok
+ ok
+T{ -1 0 MAX -> 0 }T ok
+ ok
+T{ -1 1 MAX -> 1 }T ok
+ ok
+T{ MIN-INT 0 MAX -> 0 }T ok
+ ok
+T{ MIN-INT MAX-INT MAX -> MAX-INT }T ok
+ ok
+T{ 0 MAX-INT MAX -> MAX-INT }T ok
+ ok
+T{ 0 0 MAX -> 0 }T ok
+ ok
+T{ 1 1 MAX -> 1 }T ok
+ ok
+T{ 1 0 MAX -> 1 }T ok
+ ok
+T{ 2 1 MAX -> 2 }T ok
+ ok
+T{ 0 -1 MAX -> 0 }T ok
+ ok
+T{ 1 -1 MAX -> 1 }T ok
+ ok
+T{ 0 MIN-INT MAX -> 0 }T ok
+ ok
+T{ MAX-INT MIN-INT MAX -> MAX-INT }T ok
+ ok
+T{ MAX-INT 0 MAX -> MAX-INT }T ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING STACK OPS: 2DROP 2DUP 2OVER 2SWAP ?DUP DEPTH DROP DUP OVER ROT SWAP *ok
+ ok
+ ok
+ ok
+T{ 1 2 2DROP -> }T ok
+ ok
+T{ 1 2 2DUP -> 1 2 1 2 }T ok
+ ok
+T{ 1 2 3 4 2OVER -> 1 2 3 4 1 2 }T ok
+ ok
+T{ 1 2 3 4 2SWAP -> 3 4 1 2 }T ok
+ ok
+T{ 0 ?DUP -> 0 }T ok
+ ok
+T{ 1 ?DUP -> 1 1 }T ok
+ ok
+T{ -1 ?DUP -> -1 -1 }T ok
+ ok
+T{ DEPTH -> 0 }T ok
+ ok
+T{ 0 DEPTH -> 0 1 }T ok
+ ok
+T{ 0 1 DEPTH -> 0 1 2 }T ok
+ ok
+T{ 0 DROP -> }T ok
+ ok
+T{ 1 2 DROP -> 1 }T ok
+ ok
+T{ 1 DUP -> 1 1 }T ok
+ ok
+T{ 1 2 OVER -> 1 2 1 }T ok
+ ok
+T{ 1 2 3 ROT -> 2 3 1 }T ok
+ ok
+T{ 1 2 SWAP -> 2 1 }T ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING >R R> R@ *ok
+ ok
+ ok
+ ok
+T{ : GR1 >R R> ; -> }T ok
+ ok
+T{ : GR2 >R R@ R> DROP ; -> }T ok
+ ok
+T{ 123 GR1 -> 123 }T ok
+ ok
+T{ 123 GR2 -> 123 }T ok
+ ok
+T{ 1S GR1 -> 1S }T   ( RETURN STACK HOLDS CELLS ) ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING ADD/SUBTRACT: + - 1+ 1- ABS NEGATE *ok
+ ok
+ ok
+ ok
+T{ 0 5 + -> 5 }T ok
+ ok
+T{ 5 0 + -> 5 }T ok
+ ok
+T{ 0 -5 + -> -5 }T ok
+ ok
+T{ -5 0 + -> -5 }T ok
+ ok
+T{ 1 2 + -> 3 }T ok
+ ok
+T{ 1 -2 + -> -1 }T ok
+ ok
+T{ -1 2 + -> 1 }T ok
+ ok
+T{ -1 -2 + -> -3 }T ok
+ ok
+T{ -1 1 + -> 0 }T ok
+ ok
+T{ MID-UINT 1 + -> MID-UINT+1 }T ok
+ ok
+ ok
+ ok
+T{ 0 5 - -> -5 }T ok
+ ok
+T{ 5 0 - -> 5 }T ok
+ ok
+T{ 0 -5 - -> 5 }T ok
+ ok
+T{ -5 0 - -> -5 }T ok
+ ok
+T{ 1 2 - -> -1 }T ok
+ ok
+T{ 1 -2 - -> 3 }T ok
+ ok
+T{ -1 2 - -> -3 }T ok
+ ok
+T{ -1 -2 - -> 1 }T ok
+ ok
+T{ 0 1 - -> -1 }T ok
+ ok
+T{ MID-UINT+1 1 - -> MID-UINT }T ok
+ ok
+ ok
+ ok
+T{ 0 1+ -> 1 }T ok
+ ok
+T{ -1 1+ -> 0 }T ok
+ ok
+T{ 1 1+ -> 2 }T ok
+ ok
+T{ MID-UINT 1+ -> MID-UINT+1 }T ok
+ ok
+ ok
+ ok
+T{ 2 1- -> 1 }T ok
+ ok
+T{ 1 1- -> 0 }T ok
+ ok
+T{ 0 1- -> -1 }T ok
+ ok
+T{ MID-UINT+1 1- -> MID-UINT }T ok
+ ok
+ ok
+ ok
+T{ 0 NEGATE -> 0 }T ok
+ ok
+T{ 1 NEGATE -> -1 }T ok
+ ok
+T{ -1 NEGATE -> 1 }T ok
+ ok
+T{ 2 NEGATE -> -2 }T ok
+ ok
+T{ -2 NEGATE -> 2 }T ok
+ ok
+ ok
+ ok
+T{ 0 ABS -> 0 }T ok
+ ok
+T{ 1 ABS -> 1 }T ok
+ ok
+T{ -1 ABS -> 1 }T ok
+ ok
+T{ MIN-INT ABS -> MID-UINT+1 }T ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING MULTIPLY: S>D * M* UM* *ok
+ ok
+ ok
+ ok
+T{ 0 S>D -> 0 0 }T ok
+ ok
+T{ 1 S>D -> 1 0 }T ok
+ ok
+T{ 2 S>D -> 2 0 }T ok
+ ok
+T{ -1 S>D -> -1 -1 }T ok
+ ok
+T{ -2 S>D -> -2 -1 }T ok
+ ok
+T{ MIN-INT S>D -> MIN-INT -1 }T ok
+ ok
+T{ MAX-INT S>D -> MAX-INT 0 }T ok
+ ok
+ ok
+ ok
+T{ 0 0 M* -> 0 S>D }T ok
+ ok
+T{ 0 1 M* -> 0 S>D }T ok
+ ok
+T{ 1 0 M* -> 0 S>D }T ok
+ ok
+T{ 1 2 M* -> 2 S>D }T ok
+ ok
+T{ 2 1 M* -> 2 S>D }T ok
+ ok
+T{ 3 3 M* -> 9 S>D }T ok
+ ok
+T{ -3 3 M* -> -9 S>D }T ok
+ ok
+T{ 3 -3 M* -> -9 S>D }T ok
+ ok
+T{ -3 -3 M* -> 9 S>D }T ok
+ ok
+T{ 0 MIN-INT M* -> 0 S>D }T ok
+ ok
+T{ 1 MIN-INT M* -> MIN-INT S>D }T ok
+ ok
+T{ 2 MIN-INT M* -> 0 1S }T ok
+ ok
+T{ 0 MAX-INT M* -> 0 S>D }T ok
+ ok
+T{ 1 MAX-INT M* -> MAX-INT S>D }T ok
+ ok
+T{ 2 MAX-INT M* -> MAX-INT 1 LSHIFT 0 }T ok
+ ok
+T{ MIN-INT MIN-INT M* -> 0 MSB 1 RSHIFT }T ok
+ ok
+T{ MAX-INT MIN-INT M* -> MSB MSB 2/ }T ok
+ ok
+T{ MAX-INT MAX-INT M* -> 1 MSB 2/ INVERT }T ok
+ ok
+ ok
+ ok
+T{ 0 0 * -> 0 }T                                \ TEST IDENTITIES ok
+ ok
+T{ 0 1 * -> 0 }T ok
+ ok
+T{ 1 0 * -> 0 }T ok
+ ok
+T{ 1 2 * -> 2 }T ok
+ ok
+T{ 2 1 * -> 2 }T ok
+ ok
+T{ 3 3 * -> 9 }T ok
+ ok
+T{ -3 3 * -> -9 }T ok
+ ok
+T{ 3 -3 * -> -9 }T ok
+ ok
+T{ -3 -3 * -> 9 }T ok
+ ok
+ ok
+ ok
+T{ MID-UINT+1 1 RSHIFT 2 * -> MID-UINT+1 }T ok
+ ok
+T{ MID-UINT+1 2 RSHIFT 4 * -> MID-UINT+1 }T ok
+ ok
+T{ MID-UINT+1 1 RSHIFT MID-UINT+1 OR 2 * -> MID-UINT+1 }T ok
+ ok
+ ok
+ ok
+T{ 0 0 UM* -> 0 0 }T ok
+ ok
+T{ 0 1 UM* -> 0 0 }T ok
+ ok
+T{ 1 0 UM* -> 0 0 }T ok
+ ok
+T{ 1 2 UM* -> 2 0 }T ok
+ ok
+T{ 2 1 UM* -> 2 0 }T ok
+ ok
+T{ 3 3 UM* -> 9 0 }T ok
+ ok
+ ok
+ ok
+T{ MID-UINT+1 1 RSHIFT 2 UM* -> MID-UINT+1 0 }T ok
+ ok
+T{ MID-UINT+1 2 UM* -> 0 1 }T ok
+ ok
+T{ MID-UINT+1 4 UM* -> 0 2 }T ok
+ ok
+T{ 1S 2 UM* -> 1S 1 LSHIFT 1 }T ok
+ ok
+T{ MAX-UINT MAX-UINT UM* -> 1 1 INVERT }T ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING DIVIDE: FM/MOD SM/REM UM/MOD */ */MOD / /MOD MOD *ok
+ ok
+ ok
+ ok
+T{ 0 S>D 1 FM/MOD -> 0 0 }T ok
+ ok
+T{ 1 S>D 1 FM/MOD -> 0 1 }T ok
+ ok
+T{ 2 S>D 1 FM/MOD -> 0 2 }T ok
+ ok
+T{ -1 S>D 1 FM/MOD -> 0 -1 }T ok
+ ok
+T{ -2 S>D 1 FM/MOD -> 0 -2 }T ok
+ ok
+T{ 0 S>D -1 FM/MOD -> 0 0 }T ok
+ ok
+T{ 1 S>D -1 FM/MOD -> 0 -1 }T ok
+ ok
+T{ 2 S>D -1 FM/MOD -> 0 -2 }T ok
+ ok
+T{ -1 S>D -1 FM/MOD -> 0 1 }T ok
+ ok
+T{ -2 S>D -1 FM/MOD -> 0 2 }T ok
+ ok
+T{ 2 S>D 2 FM/MOD -> 0 1 }T ok
+ ok
+T{ -1 S>D -1 FM/MOD -> 0 1 }T ok
+ ok
+T{ -2 S>D -2 FM/MOD -> 0 1 }T ok
+ ok
+T{  7 S>D  3 FM/MOD -> 1 2 }T ok
+ ok
+T{  7 S>D -3 FM/MOD -> -2 -3 }T ok
+ ok
+T{ -7 S>D  3 FM/MOD -> 2 -3 }T ok
+ ok
+T{ -7 S>D -3 FM/MOD -> -1 2 }T ok
+ ok
+T{ MAX-INT S>D 1 FM/MOD -> 0 MAX-INT }T ok
+ ok
+T{ MIN-INT S>D 1 FM/MOD -> 0 MIN-INT }T ok
+ ok
+T{ MAX-INT S>D MAX-INT FM/MOD -> 0 1 }T ok
+ ok
+T{ MIN-INT S>D MIN-INT FM/MOD -> 0 1 }T ok
+ ok
+T{ 1S 1 4 FM/MOD -> 3 MAX-INT }T ok
+ ok
+T{ 1 MIN-INT M* 1 FM/MOD -> 0 MIN-INT }T ok
+ ok
+T{ 1 MIN-INT M* MIN-INT FM/MOD -> 0 1 }T ok
+ ok
+T{ 2 MIN-INT M* 2 FM/MOD -> 0 MIN-INT }T ok
+ ok
+T{ 2 MIN-INT M* MIN-INT FM/MOD -> 0 2 }T ok
+ ok
+T{ 1 MAX-INT M* 1 FM/MOD -> 0 MAX-INT }T ok
+ ok
+T{ 1 MAX-INT M* MAX-INT FM/MOD -> 0 1 }T ok
+ ok
+T{ 2 MAX-INT M* 2 FM/MOD -> 0 MAX-INT }T ok
+ ok
+T{ 2 MAX-INT M* MAX-INT FM/MOD -> 0 2 }T ok
+ ok
+T{ MIN-INT MIN-INT M* MIN-INT FM/MOD -> 0 MIN-INT }T ok
+ ok
+T{ MIN-INT MAX-INT M* MIN-INT FM/MOD -> 0 MAX-INT }T ok
+ ok
+T{ MIN-INT MAX-INT M* MAX-INT FM/MOD -> 0 MIN-INT }T ok
+ ok
+T{ MAX-INT MAX-INT M* MAX-INT FM/MOD -> 0 MAX-INT }T ok
+ ok
+ ok
+ ok
+T{ 0 S>D 1 SM/REM -> 0 0 }T ok
+ ok
+T{ 1 S>D 1 SM/REM -> 0 1 }T ok
+ ok
+T{ 2 S>D 1 SM/REM -> 0 2 }T ok
+ ok
+T{ -1 S>D 1 SM/REM -> 0 -1 }T ok
+ ok
+T{ -2 S>D 1 SM/REM -> 0 -2 }T ok
+ ok
+T{ 0 S>D -1 SM/REM -> 0 0 }T ok
+ ok
+T{ 1 S>D -1 SM/REM -> 0 -1 }T ok
+ ok
+T{ 2 S>D -1 SM/REM -> 0 -2 }T ok
+ ok
+T{ -1 S>D -1 SM/REM -> 0 1 }T ok
+ ok
+T{ -2 S>D -1 SM/REM -> 0 2 }T ok
+ ok
+T{ 2 S>D 2 SM/REM -> 0 1 }T ok
+ ok
+T{ -1 S>D -1 SM/REM -> 0 1 }T ok
+ ok
+T{ -2 S>D -2 SM/REM -> 0 1 }T ok
+ ok
+T{  7 S>D  3 SM/REM -> 1 2 }T ok
+ ok
+T{  7 S>D -3 SM/REM -> 1 -2 }T ok
+ ok
+T{ -7 S>D  3 SM/REM -> -1 -2 }T ok
+ ok
+T{ -7 S>D -3 SM/REM -> -1 2 }T ok
+ ok
+T{ MAX-INT S>D 1 SM/REM -> 0 MAX-INT }T ok
+ ok
+T{ MIN-INT S>D 1 SM/REM -> 0 MIN-INT }T ok
+ ok
+T{ MAX-INT S>D MAX-INT SM/REM -> 0 1 }T ok
+ ok
+T{ MIN-INT S>D MIN-INT SM/REM -> 0 1 }T ok
+ ok
+T{ 1S 1 4 SM/REM -> 3 MAX-INT }T ok
+ ok
+T{ 2 MIN-INT M* 2 SM/REM -> 0 MIN-INT }T ok
+ ok
+T{ 2 MIN-INT M* MIN-INT SM/REM -> 0 2 }T ok
+ ok
+T{ 2 MAX-INT M* 2 SM/REM -> 0 MAX-INT }T ok
+ ok
+T{ 2 MAX-INT M* MAX-INT SM/REM -> 0 2 }T ok
+ ok
+T{ MIN-INT MIN-INT M* MIN-INT SM/REM -> 0 MIN-INT }T ok
+ ok
+T{ MIN-INT MAX-INT M* MIN-INT SM/REM -> 0 MAX-INT }T ok
+ ok
+T{ MIN-INT MAX-INT M* MAX-INT SM/REM -> 0 MIN-INT }T ok
+ ok
+T{ MAX-INT MAX-INT M* MAX-INT SM/REM -> 0 MAX-INT }T ok
+ ok
+ ok
+ ok
+T{ 0 0 1 UM/MOD -> 0 0 }T ok
+ ok
+T{ 1 0 1 UM/MOD -> 0 1 }T ok
+ ok
+T{ 1 0 2 UM/MOD -> 1 0 }T ok
+ ok
+T{ 3 0 2 UM/MOD -> 1 1 }T ok
+ ok
+T{ MAX-UINT 2 UM* 2 UM/MOD -> 0 MAX-UINT }T ok
+ ok
+T{ MAX-UINT 2 UM* MAX-UINT UM/MOD -> 0 2 }T ok
+ ok
+T{ MAX-UINT MAX-UINT UM* MAX-UINT UM/MOD -> 0 MAX-UINT }T ok
+ ok
+ ok
+ ok
+: IFFLOORED 
+ 
+   [ -3 2 / -2 = INVERT ] LITERAL IF POSTPONE \ THEN ; ok
+ ok
+ ok
+ ok
+: IFSYM 
+ 
+   [ -3 2 / -1 = INVERT ] LITERAL IF POSTPONE \ THEN ; ok
+ ok
+ ok
+ ok
+\ THE SYSTEM MIGHT DO EITHER FLOORED OR SYMMETRIC DIVISION. ok
+ ok
+\ SINCE WE HAVE ALREADY TESTED M*, FM/MOD, AND SM/REM WE CAN USE THEM IN TEST. ok
+ ok
+ ok
+ ok
+IFFLOORED : T/MOD  >R S>D R> FM/MOD ; ok
+ ok
+IFFLOORED : T/     T/MOD SWAP DROP ; ok
+ ok
+IFFLOORED : TMOD   T/MOD DROP ; ok
+ ok
+IFFLOORED : T*/MOD >R M* R> FM/MOD ; ok
+ ok
+IFFLOORED : T*/    T*/MOD SWAP DROP ; ok
+ ok
+IFSYM     : T/MOD  >R S>D R> SM/REM ; ok
+ ok
+IFSYM     : T/     T/MOD SWAP DROP ; ok
+ ok
+IFSYM     : TMOD   T/MOD DROP ; ok
+ ok
+IFSYM     : T*/MOD >R M* R> SM/REM ; ok
+ ok
+IFSYM     : T*/    T*/MOD SWAP DROP ; ok
+ ok
+ ok
+ ok
+T{ 0 1 /MOD -> 0 1 T/MOD }T ok
+ ok
+T{ 1 1 /MOD -> 1 1 T/MOD }T ok
+ ok
+T{ 2 1 /MOD -> 2 1 T/MOD }T ok
+ ok
+T{ -1 1 /MOD -> -1 1 T/MOD }T ok
+ ok
+T{ -2 1 /MOD -> -2 1 T/MOD }T ok
+ ok
+T{ 0 -1 /MOD -> 0 -1 T/MOD }T ok
+ ok
+T{ 1 -1 /MOD -> 1 -1 T/MOD }T ok
+ ok
+T{ 2 -1 /MOD -> 2 -1 T/MOD }T ok
+ ok
+T{ -1 -1 /MOD -> -1 -1 T/MOD }T ok
+ ok
+T{ -2 -1 /MOD -> -2 -1 T/MOD }T ok
+ ok
+T{ 2 2 /MOD -> 2 2 T/MOD }T ok
+ ok
+T{ -1 -1 /MOD -> -1 -1 T/MOD }T ok
+ ok
+T{ -2 -2 /MOD -> -2 -2 T/MOD }T ok
+ ok
+T{ 7 3 /MOD -> 7 3 T/MOD }T ok
+ ok
+T{ 7 -3 /MOD -> 7 -3 T/MOD }T ok
+ ok
+T{ -7 3 /MOD -> -7 3 T/MOD }T ok
+ ok
+T{ -7 -3 /MOD -> -7 -3 T/MOD }T ok
+ ok
+T{ MAX-INT 1 /MOD -> MAX-INT 1 T/MOD }T ok
+ ok
+T{ MIN-INT 1 /MOD -> MIN-INT 1 T/MOD }T ok
+ ok
+T{ MAX-INT MAX-INT /MOD -> MAX-INT MAX-INT T/MOD }T ok
+ ok
+T{ MIN-INT MIN-INT /MOD -> MIN-INT MIN-INT T/MOD }T ok
+ ok
+ ok
+ ok
+T{ 0 1 / -> 0 1 T/ }T ok
+ ok
+T{ 1 1 / -> 1 1 T/ }T ok
+ ok
+T{ 2 1 / -> 2 1 T/ }T ok
+ ok
+T{ -1 1 / -> -1 1 T/ }T ok
+ ok
+T{ -2 1 / -> -2 1 T/ }T ok
+ ok
+T{ 0 -1 / -> 0 -1 T/ }T ok
+ ok
+T{ 1 -1 / -> 1 -1 T/ }T ok
+ ok
+T{ 2 -1 / -> 2 -1 T/ }T ok
+ ok
+T{ -1 -1 / -> -1 -1 T/ }T ok
+ ok
+T{ -2 -1 / -> -2 -1 T/ }T ok
+ ok
+T{ 2 2 / -> 2 2 T/ }T ok
+ ok
+T{ -1 -1 / -> -1 -1 T/ }T ok
+ ok
+T{ -2 -2 / -> -2 -2 T/ }T ok
+ ok
+T{ 7 3 / -> 7 3 T/ }T ok
+ ok
+T{ 7 -3 / -> 7 -3 T/ }T ok
+ ok
+T{ -7 3 / -> -7 3 T/ }T ok
+ ok
+T{ -7 -3 / -> -7 -3 T/ }T ok
+ ok
+T{ MAX-INT 1 / -> MAX-INT 1 T/ }T ok
+ ok
+T{ MIN-INT 1 / -> MIN-INT 1 T/ }T ok
+ ok
+T{ MAX-INT MAX-INT / -> MAX-INT MAX-INT T/ }T ok
+ ok
+T{ MIN-INT MIN-INT / -> MIN-INT MIN-INT T/ }T ok
+ ok
+ ok
+ ok
+T{ 0 1 MOD -> 0 1 TMOD }T ok
+ ok
+T{ 1 1 MOD -> 1 1 TMOD }T ok
+ ok
+T{ 2 1 MOD -> 2 1 TMOD }T ok
+ ok
+T{ -1 1 MOD -> -1 1 TMOD }T ok
+ ok
+T{ -2 1 MOD -> -2 1 TMOD }T ok
+ ok
+T{ 0 -1 MOD -> 0 -1 TMOD }T ok
+ ok
+T{ 1 -1 MOD -> 1 -1 TMOD }T ok
+ ok
+T{ 2 -1 MOD -> 2 -1 TMOD }T ok
+ ok
+T{ -1 -1 MOD -> -1 -1 TMOD }T ok
+ ok
+T{ -2 -1 MOD -> -2 -1 TMOD }T ok
+ ok
+T{ 2 2 MOD -> 2 2 TMOD }T ok
+ ok
+T{ -1 -1 MOD -> -1 -1 TMOD }T ok
+ ok
+T{ -2 -2 MOD -> -2 -2 TMOD }T ok
+ ok
+T{ 7 3 MOD -> 7 3 TMOD }T ok
+ ok
+T{ 7 -3 MOD -> 7 -3 TMOD }T ok
+ ok
+T{ -7 3 MOD -> -7 3 TMOD }T ok
+ ok
+T{ -7 -3 MOD -> -7 -3 TMOD }T ok
+ ok
+T{ MAX-INT 1 MOD -> MAX-INT 1 TMOD }T ok
+ ok
+T{ MIN-INT 1 MOD -> MIN-INT 1 TMOD }T ok
+ ok
+T{ MAX-INT MAX-INT MOD -> MAX-INT MAX-INT TMOD }T ok
+ ok
+T{ MIN-INT MIN-INT MOD -> MIN-INT MIN-INT TMOD }T ok
+ ok
+ ok
+ ok
+T{ 0 2 1 */ -> 0 2 1 T*/ }T ok
+ ok
+T{ 1 2 1 */ -> 1 2 1 T*/ }T ok
+ ok
+T{ 2 2 1 */ -> 2 2 1 T*/ }T ok
+ ok
+T{ -1 2 1 */ -> -1 2 1 T*/ }T ok
+ ok
+T{ -2 2 1 */ -> -2 2 1 T*/ }T ok
+ ok
+T{ 0 2 -1 */ -> 0 2 -1 T*/ }T ok
+ ok
+T{ 1 2 -1 */ -> 1 2 -1 T*/ }T ok
+ ok
+T{ 2 2 -1 */ -> 2 2 -1 T*/ }T ok
+ ok
+T{ -1 2 -1 */ -> -1 2 -1 T*/ }T ok
+ ok
+T{ -2 2 -1 */ -> -2 2 -1 T*/ }T ok
+ ok
+T{ 2 2 2 */ -> 2 2 2 T*/ }T ok
+ ok
+T{ -1 2 -1 */ -> -1 2 -1 T*/ }T ok
+ ok
+T{ -2 2 -2 */ -> -2 2 -2 T*/ }T ok
+ ok
+T{ 7 2 3 */ -> 7 2 3 T*/ }T ok
+ ok
+T{ 7 2 -3 */ -> 7 2 -3 T*/ }T ok
+ ok
+T{ -7 2 3 */ -> -7 2 3 T*/ }T ok
+ ok
+T{ -7 2 -3 */ -> -7 2 -3 T*/ }T ok
+ ok
+T{ MAX-INT 2 MAX-INT */ -> MAX-INT 2 MAX-INT T*/ }T ok
+ ok
+T{ MIN-INT 2 MIN-INT */ -> MIN-INT 2 MIN-INT T*/ }T ok
+ ok
+ ok
+ ok
+T{ 0 2 1 */MOD -> 0 2 1 T*/MOD }T ok
+ ok
+T{ 1 2 1 */MOD -> 1 2 1 T*/MOD }T ok
+ ok
+T{ 2 2 1 */MOD -> 2 2 1 T*/MOD }T ok
+ ok
+T{ -1 2 1 */MOD -> -1 2 1 T*/MOD }T ok
+ ok
+T{ -2 2 1 */MOD -> -2 2 1 T*/MOD }T ok
+ ok
+T{ 0 2 -1 */MOD -> 0 2 -1 T*/MOD }T ok
+ ok
+T{ 1 2 -1 */MOD -> 1 2 -1 T*/MOD }T ok
+ ok
+T{ 2 2 -1 */MOD -> 2 2 -1 T*/MOD }T ok
+ ok
+T{ -1 2 -1 */MOD -> -1 2 -1 T*/MOD }T ok
+ ok
+T{ -2 2 -1 */MOD -> -2 2 -1 T*/MOD }T ok
+ ok
+T{ 2 2 2 */MOD -> 2 2 2 T*/MOD }T ok
+ ok
+T{ -1 2 -1 */MOD -> -1 2 -1 T*/MOD }T ok
+ ok
+T{ -2 2 -2 */MOD -> -2 2 -2 T*/MOD }T ok
+ ok
+T{ 7 2 3 */MOD -> 7 2 3 T*/MOD }T ok
+ ok
+T{ 7 2 -3 */MOD -> 7 2 -3 T*/MOD }T ok
+ ok
+T{ -7 2 3 */MOD -> -7 2 3 T*/MOD }T ok
+ ok
+T{ -7 2 -3 */MOD -> -7 2 -3 T*/MOD }T ok
+ ok
+T{ MAX-INT 2 MAX-INT */MOD -> MAX-INT 2 MAX-INT T*/MOD }T ok
+ ok
+T{ MIN-INT 2 MIN-INT */MOD -> MIN-INT 2 MIN-INT T*/MOD }T ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING HERE , @ ! CELL+ CELLS C, C@ C! CHARS 2@ 2! ALIGN ALIGNED +! ALLOT *ok
+ ok
+ ok
+ ok
+HERE 1 ALLOT ok
+ ok
+HERE ok
+ ok
+CONSTANT 2NDA ok
+ ok
+CONSTANT 1STA ok
+ ok
+T{ 1STA 2NDA U< -> <TRUE> }T            \ HERE MUST GROW WITH ALLOT ok
+ ok
+T{ 1STA 1+ -> 2NDA }T                   \ ... BY ONE ADDRESS UNIT ok
+ ok
+( MISSING TEST: NEGATIVE ALLOT ) ok
+ ok
+ ok
+ ok
+ALIGN ok
+ ok
+HERE 1 , ok
+ ok
+HERE 2 , ok
+ ok
+CONSTANT 2ND ok
+ ok
+CONSTANT 1ST ok
+ ok
+T{ 1ST 2ND U< -> <TRUE> }T                      \ HERE MUST GROW WITH ALLOT ok
+ ok
+T{ 1ST CELL+ -> 2ND }T                  \ ... BY ONE CELL ok
+ ok
+T{ 1ST 1 CELLS + -> 2ND }T ok
+ ok
+T{ 1ST @ 2ND @ -> 1 2 }T ok
+ ok
+T{ 5 1ST ! -> }T ok
+ ok
+T{ 1ST @ 2ND @ -> 5 2 }T ok
+ ok
+T{ 6 2ND ! -> }T ok
+ ok
+T{ 1ST @ 2ND @ -> 5 6 }T ok
+ ok
+T{ 1ST 2@ -> 6 5 }T ok
+ ok
+T{ 2 1 1ST 2! -> }T ok
+ ok
+T{ 1ST 2@ -> 2 1 }T ok
+ ok
+T{ 1S 1ST !  1ST @ -> 1S }T             \ CAN STORE CELL-WIDE VALUE ok
+ ok
+ ok
+ ok
+HERE 1 C, ok
+ ok
+HERE 2 C, ok
+ ok
+CONSTANT 2NDC ok
+ ok
+CONSTANT 1STC ok
+ ok
+T{ 1STC 2NDC U< -> <TRUE> }T            \ HERE MUST GROW WITH ALLOT ok
+ ok
+T{ 1STC CHAR+ -> 2NDC }T                        \ ... BY ONE CHAR ok
+ ok
+T{ 1STC 1 CHARS + -> 2NDC }T ok
+ ok
+T{ 1STC C@ 2NDC C@ -> 1 2 }T ok
+ ok
+T{ 3 1STC C! -> }T ok
+ ok
+T{ 1STC C@ 2NDC C@ -> 3 2 }T ok
+ ok
+T{ 4 2NDC C! -> }T ok
+ ok
+T{ 1STC C@ 2NDC C@ -> 3 4 }T ok
+ ok
+ ok
+ ok
+ALIGN 1 ALLOT HERE ALIGN HERE 3 CELLS ALLOT ok
+ ok
+CONSTANT A-ADDR  CONSTANT UA-ADDR ok
+ ok
+T{ UA-ADDR ALIGNED -> A-ADDR }T ok
+ ok
+T{    1 A-ADDR C!  A-ADDR C@ ->    1 }T ok
+ ok
+T{ 1234 A-ADDR  !  A-ADDR  @ -> 1234 }T ok
+ ok
+T{ 123 456 A-ADDR 2!  A-ADDR 2@ -> 123 456 }T ok
+ ok
+T{ 2 A-ADDR CHAR+ C!  A-ADDR CHAR+ C@ -> 2 }T ok
+ ok
+T{ 3 A-ADDR CELL+ C!  A-ADDR CELL+ C@ -> 3 }T ok
+ ok
+T{ 1234 A-ADDR CELL+ !  A-ADDR CELL+ @ -> 1234 }T ok
+ ok
+T{ 123 456 A-ADDR CELL+ 2!  A-ADDR CELL+ 2@ -> 123 456 }T ok
+ ok
+ ok
+ ok
+: BITS ( X -- U ) 
+ 
+   0 SWAP BEGIN DUP WHILE DUP MSB AND IF >R 1+ R> THEN 2* REPEAT DROP ; ok
+ ok
+( CHARACTERS >= 1 AU, <= SIZE OF CELL, >= 8 BITS ) ok
+ ok
+T{ 1 CHARS 1 < -> <FALSE> }T ok
+ ok
+T{ 1 CHARS 1 CELLS > -> <FALSE> }T ok
+ ok
+( TBD: HOW TO FIND NUMBER OF BITS? ) ok
+ ok
+ ok
+ ok
+( CELLS >= 1 AU, INTEGRAL MULTIPLE OF CHAR SIZE, >= 16 BITS ) ok
+ ok
+T{ 1 CELLS 1 < -> <FALSE> }T ok
+ ok
+T{ 1 CELLS 1 CHARS MOD -> 0 }T ok
+ ok
+T{ 1S BITS 10 < -> <FALSE> }T ok
+ ok
+ ok
+ ok
+T{ 0 1ST ! -> }T ok
+ ok
+T{ 1 1ST +! -> }T ok
+ ok
+T{ 1ST @ -> 1 }T ok
+ ok
+T{ -1 1ST +! 1ST @ -> 0 }T ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING CHAR [CHAR] [ ] BL S" *ok
+ ok
+ ok
+ ok
+T{ BL -> 20 }T ok
+ ok
+T{ CHAR X -> 58 }T ok
+ ok
+T{ CHAR HELLO -> 48 }T ok
+ ok
+T{ : GC1 [CHAR] X ; -> }T ok
+ ok
+T{ : GC2 [CHAR] HELLO ; -> }T ok
+ ok
+T{ GC1 -> 58 }T ok
+ ok
+T{ GC2 -> 48 }T ok
+ ok
+T{ : GC3 [ GC1 ] LITERAL ; -> }T ok
+ ok
+T{ GC3 -> 58 }T ok
+ ok
+T{ : GC4 S" XY" ; -> }T ok
+ ok
+T{ GC4 SWAP DROP -> 2 }T ok
+ ok
+T{ GC4 DROP DUP C@ SWAP CHAR+ C@ -> 58 59 }T ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING ' ['] FIND EXECUTE IMMEDIATE COUNT LITERAL POSTPONE STATE *ok
+ ok
+ ok
+ ok
+T{ : GT1 123 ; -> }T ok
+ ok
+T{ ' GT1 EXECUTE -> 123 }T ok
+ ok
+T{ : GT2 ['] GT1 ; IMMEDIATE -> }T ok
+ ok
+T{ GT2 EXECUTE -> 123 }T ok
+ ok
+HERE 3 C, CHAR G C, CHAR T C, CHAR 1 C, CONSTANT GT1STRING ok
+ ok
+HERE 3 C, CHAR G C, CHAR T C, CHAR 2 C, CONSTANT GT2STRING ok
+ ok
+T{ GT1STRING FIND -> ' GT1 -1 }T ok
+ ok
+T{ GT2STRING FIND -> ' GT2 1 }T ok
+ ok
+( HOW TO SEARCH FOR NON-EXISTENT WORD? ) ok
+ ok
+T{ : GT3 GT2 LITERAL ; -> }T ok
+ ok
+T{ GT3 -> ' GT1 }T ok
+ ok
+T{ GT1STRING COUNT -> GT1STRING CHAR+ 3 }T ok
+ ok
+ ok
+ ok
+T{ : GT4 POSTPONE GT1 ; IMMEDIATE -> }T ok
+ ok
+T{ : GT5 GT4 ; -> }T ok
+ ok
+T{ GT5 -> 123 }T ok
+ ok
+T{ : GT6 345 ; IMMEDIATE -> }T ok
+ ok
+T{ : GT7 POSTPONE GT6 ; -> }T ok
+ ok
+T{ GT7 -> 345 }T ok
+ ok
+ ok
+ ok
+T{ : GT8 STATE @ ; IMMEDIATE -> }T ok
+ ok
+T{ GT8 -> 0 }T ok
+ ok
+T{ : GT9 GT8 LITERAL ; -> }T ok
+ ok
+T{ GT9 0= -> <FALSE> }T ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING IF ELSE THEN BEGIN WHILE REPEAT UNTIL RECURSE *ok
+ ok
+ ok
+ ok
+T{ : GI1 IF 123 THEN ; -> }T ok
+ ok
+T{ : GI2 IF 123 ELSE 234 THEN ; -> }T ok
+ ok
+T{ 0 GI1 -> }T ok
+ ok
+T{ 1 GI1 -> 123 }T ok
+ ok
+T{ -1 GI1 -> 123 }T ok
+ ok
+T{ 0 GI2 -> 234 }T ok
+ ok
+T{ 1 GI2 -> 123 }T ok
+ ok
+T{ -1 GI1 -> 123 }T ok
+ ok
+ ok
+ ok
+T{ : GI3 BEGIN DUP 5 < WHILE DUP 1+ REPEAT ; -> }T ok
+ ok
+T{ 0 GI3 -> 0 1 2 3 4 5 }T ok
+ ok
+T{ 4 GI3 -> 4 5 }T ok
+ ok
+T{ 5 GI3 -> 5 }T ok
+ ok
+T{ 6 GI3 -> 6 }T ok
+ ok
+ ok
+ ok
+T{ : GI4 BEGIN DUP 1+ DUP 5 > UNTIL ; -> }T ok
+ ok
+T{ 3 GI4 -> 3 4 5 6 }T ok
+ ok
+T{ 5 GI4 -> 5 6 }T ok
+ ok
+T{ 6 GI4 -> 6 7 }T ok
+ ok
+ ok
+ ok
+T{ : GI5 BEGIN DUP 2 > WHILE DUP 5 < WHILE DUP 1+ REPEAT 123 ELSE 345 THEN ; -> }T ok
+ ok
+T{ 1 GI5 -> 1 345 }T ok
+ ok
+T{ 2 GI5 -> 2 345 }T ok
+ ok
+T{ 3 GI5 -> 3 4 5 123 }T ok
+ ok
+T{ 4 GI5 -> 4 5 123 }T ok
+ ok
+T{ 5 GI5 -> 5 123 }T ok
+ ok
+ ok
+ ok
+T{ : GI6 ( N -- 0,1,..N ) DUP IF DUP >R 1- RECURSE R> THEN ; -> }T ok
+ ok
+T{ 0 GI6 -> 0 }T ok
+ ok
+T{ 1 GI6 -> 0 1 }T ok
+ ok
+T{ 2 GI6 -> 0 1 2 }T ok
+ ok
+T{ 3 GI6 -> 0 1 2 3 }T ok
+ ok
+T{ 4 GI6 -> 0 1 2 3 4 }T ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING DO LOOP +LOOP I J UNLOOP LEAVE EXIT *ok
+ ok
+ ok
+ ok
+T{ : GD1 DO I LOOP ; -> }T ok
+ ok
+T{ 4 1 GD1 -> 1 2 3 }T ok
+ ok
+T{ 2 -1 GD1 -> -1 0 1 }T ok
+ ok
+T{ MID-UINT+1 MID-UINT GD1 -> MID-UINT }T ok
+ ok
+ ok
+ ok
+T{ : GD2 DO I -1 +LOOP ; -> }T ok
+ ok
+T{ 1 4 GD2 -> 4 3 2 1 }T ok
+ ok
+T{ -1 2 GD2 -> 2 1 0 -1 }T ok
+ ok
+T{ MID-UINT MID-UINT+1 GD2 -> MID-UINT+1 MID-UINT }T ok
+ ok
+ ok
+ ok
+T{ : GD3 DO 1 0 DO J LOOP LOOP ; -> }T ok
+ ok
+T{ 4 1 GD3 -> 1 2 3 }T ok
+ ok
+T{ 2 -1 GD3 -> -1 0 1 }T ok
+ ok
+T{ MID-UINT+1 MID-UINT GD3 -> MID-UINT }T ok
+ ok
+ ok
+ ok
+T{ : GD4 DO 1 0 DO J LOOP -1 +LOOP ; -> }T ok
+ ok
+T{ 1 4 GD4 -> 4 3 2 1 }T ok
+ ok
+T{ -1 2 GD4 -> 2 1 0 -1 }T ok
+ ok
+T{ MID-UINT MID-UINT+1 GD4 -> MID-UINT+1 MID-UINT }T ok
+ ok
+ ok
+ ok
+T{ : GD5 123 SWAP 0 DO I 4 > IF DROP 234 LEAVE THEN LOOP ; -> }T ok
+ ok
+T{ 1 GD5 -> 123 }T ok
+ ok
+T{ 5 GD5 -> 123 }T ok
+ ok
+T{ 6 GD5 -> 234 }T ok
+ ok
+ ok
+ ok
+T{ : GD6  ( PAT: T{0 0}T,T{0 0}TT{1 0}TT{1 1}T,T{0 0}TT{1 0}TT{1 1}TT{2 0}TT{2 1}TT{2 2}T ) 
+ 
+   0 SWAP 0 DO 
+ 
+      I 1+ 0 DO I J + 3 = IF I UNLOOP I UNLOOP EXIT THEN 1+ LOOP 
+ 
+    LOOP ; -> }T ok
+ ok
+T{ 1 GD6 -> 1 }T ok
+ ok
+T{ 2 GD6 -> 3 }T ok
+ ok
+T{ 3 GD6 -> 4 1 2 }T ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING DEFINING WORDS: : ; CONSTANT VARIABLE CREATE DOES> >BODY *ok
+ ok
+ ok
+ ok
+T{ 123 CONSTANT X123 -> }T ok
+ ok
+T{ X123 -> 123 }T ok
+ ok
+T{ : EQU CONSTANT ; -> }T ok
+ ok
+T{ X123 EQU Y123 -> }T ok
+ ok
+T{ Y123 -> 123 }T ok
+ ok
+ ok
+ ok
+T{ VARIABLE V1 -> }T ok
+ ok
+T{ 123 V1 ! -> }T ok
+ ok
+T{ V1 @ -> 123 }T ok
+ ok
+ ok
+ ok
+T{ : NOP : POSTPONE ; ; -> }T ok
+ ok
+T{ NOP NOP1 NOP NOP2 -> }T ok
+ ok
+T{ NOP1 -> }T ok
+ ok
+T{ NOP2 -> }T ok
+ ok
+ ok
+ ok
+T{ : DOES1 DOES> @ 1 + ; -> }T ok
+ ok
+T{ : DOES2 DOES> @ 2 + ; -> }T ok
+ ok
+T{ CREATE CR1 -> }T ok
+ ok
+T{ CR1 -> HERE }T ok
+ ok
+T{ ' CR1 >BODY -> HERE }T ok
+ ok
+T{ 1 , -> }T ok
+ ok
+T{ CR1 @ -> 1 }T ok
+ ok
+T{ DOES1 -> }T ok
+ ok
+T{ CR1 -> 2 }T ok
+ ok
+T{ DOES2 -> }T ok
+ ok
+T{ CR1 -> 3 }T ok
+ ok
+ ok
+ ok
+T{ : WEIRD: CREATE DOES> 1 + DOES> 2 + ; -> }T ok
+ ok
+T{ WEIRD: W1 -> }T ok
+ ok
+T{ ' W1 >BODY -> HERE }T ok
+ ok
+T{ W1 -> HERE 1 + }T ok
+ ok
+T{ W1 -> HERE 2 + }T ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING EVALUATE *ok
+ ok
+ ok
+ ok
+: GE1 S" 123" ; IMMEDIATE ok
+ ok
+GE1 TYPE CR  123
+ok
+ ok
+: GE2 S" 123 1+" ; IMMEDIATE ok
+ ok
+: GE3 S" : GE4 345 ;" ; ok
+ ok
+: GE5 EVALUATE ; IMMEDIATE ok
+ ok
+ ok
+ ok
+T{ GE1 EVALUATE -> 123 }T                       ( TEST EVALUATE IN INTERP. STATE ) ok
+ ok
+T{ GE2 EVALUATE -> 124 }T ok
+ ok
+T{ GE3 EVALUATE -> }T ok
+ ok
+T{ GE4 -> 345 }T ok
+ ok
+ ok
+ ok
+T{ : GE6 GE1 GE5 ; -> }T                        ( TEST EVALUATE IN COMPILE STATE ) ok
+ ok
+T{ GE6 -> 123 }T ok
+ ok
+T{ : GE7 GE2 GE5 ; -> }T ok
+ ok
+T{ GE7 -> 124 }T ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING SOURCE >IN WORD *ok
+ ok
+ ok
+ ok
+: GS1 S" SOURCE" 2DUP EVALUATE 
+ 
+       >R SWAP >R = R> R> = ; ok
+ ok
+T{ GS1 -> <TRUE> <TRUE> }T ok
+ ok
+ ok
+ ok
+VARIABLE SCANS ok
+ ok
+: RESCAN?  -1 SCANS +! SCANS @ IF 0 >IN ! THEN ; ok
+ ok
+ ok
+ ok
+T{ 2 SCANS ! ok
+ ok
+345 RESCAN? ok
+ ok
+-> 345 345 }T ok
+ ok
+ ok
+ ok
+: GS2  5 SCANS ! S" 123 RESCAN?" EVALUATE ; ok
+ ok
+T{ GS2 -> 123 123 123 123 123 }T ok
+ ok
+ ok
+ ok
+: GS3 WORD COUNT SWAP C@ ; ok
+ ok
+T{ BL GS3 HELLO -> 5 CHAR H }T ok
+ ok
+T{ CHAR " GS3 GOODBYE" -> 7 CHAR G }T ok
+ ok
+T{ BL GS3 ok
+ ok
+DROP -> 0 }T                            \ BLANK LINE RETURN ZERO-LENGTH STRING ok
+ ok
+ ok
+ ok
+: GS4 SOURCE >IN ! DROP ; ok
+ ok
+T{ GS4 123 456 ok
+ ok
+-> }T ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING <# # #S #> HOLD SIGN BASE >NUMBER HEX DECIMAL *ok
+ ok
+ ok
+ ok
+: S=  \ ( ADDR1 C1 ADDR2 C2 -- T/F ) COMPARE TWO STRINGS. 
+ 
+   >R SWAP R@ = IF                      \ MAKE SURE STRINGS HAVE SAME LENGTH 
+ 
+      R> ?DUP IF                        \ IF NON-EMPTY STRINGS 
+ 
+         0 DO 
+ 
+            OVER C@ OVER C@ - IF 2DROP <FALSE> UNLOOP EXIT THEN 
+ 
+            SWAP CHAR+ SWAP CHAR+ 
+ 
+         LOOP 
+ 
+      THEN 
+ 
+      2DROP <TRUE>                      \ IF WE GET HERE, STRINGS MATCH 
+ 
+   ELSE 
+ 
+      R> DROP 2DROP <FALSE>             \ LENGTHS MISMATCH 
+ 
+   THEN ; ok
+ ok
+ ok
+ ok
+: GP1  <# 41 HOLD 42 HOLD 0 0 #> S" BA" S= ; ok
+ ok
+T{ GP1 -> <TRUE> }T ok
+ ok
+ ok
+ ok
+: GP2  <# -1 SIGN 0 SIGN -1 SIGN 0 0 #> S" --" S= ; ok
+ ok
+T{ GP2 -> <TRUE> }T ok
+ ok
+ ok
+ ok
+: GP3  <# 1 0 # # #> S" 01" S= ; ok
+ ok
+T{ GP3 -> <TRUE> }T ok
+ ok
+ ok
+ ok
+: GP4  <# 1 0 #S #> S" 1" S= ; ok
+ ok
+T{ GP4 -> <TRUE> }T ok
+ ok
+ ok
+ ok
+24 CONSTANT MAX-BASE                    \ BASE 2 .. 36 ok
+ ok
+: COUNT-BITS 
+ 
+   0 0 INVERT BEGIN DUP WHILE >R 1+ R> 2* REPEAT DROP ; ok
+ ok
+COUNT-BITS 2* CONSTANT #BITS-UD         \ NUMBER OF BITS IN UD ok
+ ok
+ ok
+ ok
+: GP5 
+ 
+   BASE @ <TRUE> 
+ 
+   MAX-BASE 1+ 2 DO                     \ FOR EACH POSSIBLE BASE 
+ 
+      I BASE !                          \ TBD: ASSUMES BASE WORKS 
+ 
+      I 0 <# #S #> S" 10" S= AND 
+ 
+   LOOP 
+ 
+   SWAP BASE ! ; ok
+ ok
+T{ GP5 -> <TRUE> }T ok
+ ok
+ ok
+ ok
+: GP6 
+ 
+   BASE @ >R  2 BASE ! 
+ 
+   MAX-UINT MAX-UINT <# #S #>           \ MAXIMUM UD TO BINARY 
+ 
+   R> BASE !                            \ S: C-ADDR U 
+ 
+   DUP #BITS-UD = SWAP 
+ 
+   0 DO                                 \ S: C-ADDR FLAG 
+ 
+      OVER C@ [CHAR] 1 = AND            \ ALL ONES 
+ 
+      >R CHAR+ R> 
+ 
+   LOOP SWAP DROP ; ok
+ ok
+T{ GP6 -> <TRUE> }T ok
+ ok
+ ok
+ ok
+: GP7 
+ 
+   BASE @ >R    MAX-BASE BASE ! 
+ 
+   <TRUE> 
+ 
+   A 0 DO 
+ 
+      I 0 <# #S #> 
+ 
+      1 = SWAP C@ I 30 + = AND AND 
+ 
+   LOOP 
+ 
+   MAX-BASE A DO 
+ 
+      I 0 <# #S #> 
+ 
+      1 = SWAP C@ 41 I A - + = AND AND 
+ 
+   LOOP 
+ 
+   R> BASE ! ; ok
+ ok
+ ok
+ ok
+T{ GP7 -> <TRUE> }T ok
+ ok
+ ok
+ ok
+\ >NUMBER TESTS ok
+ ok
+CREATE GN-BUF 0 C, ok
+ ok
+: GN-STRING     GN-BUF 1 ; ok
+ ok
+: GN-CONSUMED   GN-BUF CHAR+ 0 ; ok
+ ok
+: GN'           [CHAR] ' WORD CHAR+ C@ GN-BUF C!  GN-STRING ; ok
+ ok
+ ok
+ ok
+T{ 0 0 GN' 0' >NUMBER -> 0 0 GN-CONSUMED }T ok
+ ok
+T{ 0 0 GN' 1' >NUMBER -> 1 0 GN-CONSUMED }T ok
+ ok
+T{ 1 0 GN' 1' >NUMBER -> BASE @ 1+ 0 GN-CONSUMED }T ok
+ ok
+T{ 0 0 GN' -' >NUMBER -> 0 0 GN-STRING }T       \ SHOULD FAIL TO CONVERT THESE ok
+ ok
+T{ 0 0 GN' +' >NUMBER -> 0 0 GN-STRING }T ok
+ ok
+T{ 0 0 GN' .' >NUMBER -> 0 0 GN-STRING }T ok
+ ok
+ ok
+ ok
+: >NUMBER-BASED 
+ 
+   BASE @ >R BASE ! >NUMBER R> BASE ! ; ok
+ ok
+ ok
+ ok
+T{ 0 0 GN' 2' 10 >NUMBER-BASED -> 2 0 GN-CONSUMED }T ok
+ ok
+T{ 0 0 GN' 2'  2 >NUMBER-BASED -> 0 0 GN-STRING }T ok
+ ok
+T{ 0 0 GN' F' 10 >NUMBER-BASED -> F 0 GN-CONSUMED }T ok
+ ok
+T{ 0 0 GN' G' 10 >NUMBER-BASED -> 0 0 GN-STRING }T ok
+ ok
+T{ 0 0 GN' G' MAX-BASE >NUMBER-BASED -> 10 0 GN-CONSUMED }T ok
+ ok
+T{ 0 0 GN' Z' MAX-BASE >NUMBER-BASED -> 23 0 GN-CONSUMED }T ok
+ ok
+ ok
+ ok
+: GN1   \ ( UD BASE -- UD' LEN ) UD SHOULD EQUAL UD' AND LEN SHOULD BE ZERO. 
+ 
+   BASE @ >R BASE ! 
+ 
+   <# #S #> 
+ 
+   0 0 2SWAP >NUMBER SWAP DROP          \ RETURN LENGTH ONLY 
+ 
+   R> BASE ! ; ok
+ ok
+T{ 0 0 2 GN1 -> 0 0 0 }T ok
+ ok
+T{ MAX-UINT 0 2 GN1 -> MAX-UINT 0 0 }T ok
+ ok
+T{ MAX-UINT DUP 2 GN1 -> MAX-UINT DUP 0 }T ok
+ ok
+T{ 0 0 MAX-BASE GN1 -> 0 0 0 }T ok
+ ok
+T{ MAX-UINT 0 MAX-BASE GN1 -> MAX-UINT 0 0 }T ok
+ ok
+T{ MAX-UINT DUP MAX-BASE GN1 -> MAX-UINT DUP 0 }T ok
+ ok
+ ok
+ ok
+: GN2   \ ( -- 16 10 ) 
+ 
+   BASE @ >R  HEX BASE @  DECIMAL BASE @  R> BASE ! ; ok
+ ok
+T{ GN2 -> 10 A }T ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING FILL MOVE *ok
+ ok
+ ok
+ ok
+CREATE FBUF 00 C, 00 C, 00 C, ok
+ ok
+CREATE SBUF 12 C, 34 C, 56 C, ok
+ ok
+: SEEBUF FBUF C@  FBUF CHAR+ C@  FBUF CHAR+ CHAR+ C@ ; ok
+ ok
+ ok
+ ok
+T{ FBUF 0 20 FILL -> }T ok
+ ok
+T{ SEEBUF -> 00 00 00 }T ok
+ ok
+ ok
+ ok
+T{ FBUF 1 20 FILL -> }T ok
+ ok
+T{ SEEBUF -> 20 00 00 }T ok
+ ok
+ ok
+ ok
+T{ FBUF 3 20 FILL -> }T ok
+ ok
+T{ SEEBUF -> 20 20 20 }T ok
+ ok
+ ok
+ ok
+T{ FBUF FBUF 3 CHARS MOVE -> }T         \ BIZARRE SPECIAL CASE ok
+ ok
+T{ SEEBUF -> 20 20 20 }T ok
+ ok
+ ok
+ ok
+T{ SBUF FBUF 0 CHARS MOVE -> }T ok
+ ok
+T{ SEEBUF -> 20 20 20 }T ok
+ ok
+ ok
+ ok
+T{ SBUF FBUF 1 CHARS MOVE -> }T ok
+ ok
+T{ SEEBUF -> 12 20 20 }T ok
+ ok
+ ok
+ ok
+T{ SBUF FBUF 3 CHARS MOVE -> }T ok
+ ok
+T{ SEEBUF -> 12 34 56 }T ok
+ ok
+ ok
+ ok
+T{ FBUF FBUF CHAR+ 2 CHARS MOVE -> }T ok
+ ok
+T{ SEEBUF -> 12 12 34 }T ok
+ ok
+ ok
+ ok
+T{ FBUF CHAR+ FBUF 2 CHARS MOVE -> }T ok
+ ok
+T{ SEEBUF -> 12 34 34 }T ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING OUTPUT: . ." CR EMIT SPACE SPACES TYPE U. *ok
+ ok
+ ok
+ ok
+: OUTPUT-TEST 
+ 
+   ." YOU SHOULD SEE THE STANDARD GRAPHIC CHARACTERS:" CR 
+ 
+   41 BL DO I EMIT LOOP CR 
+ 
+   61 41 DO I EMIT LOOP CR 
+ 
+   7F 61 DO I EMIT LOOP CR 
+ 
+   ." YOU SHOULD SEE 0-9 SEPARATED BY A SPACE:" CR 
+ 
+   9 1+ 0 DO I . LOOP CR 
+ 
+   ." YOU SHOULD SEE 0-9 (WITH NO SPACES):" CR 
+ 
+   [CHAR] 9 1+ [CHAR] 0 DO I 0 SPACES EMIT LOOP CR 
+ 
+   ." YOU SHOULD SEE A-G SEPARATED BY A SPACE:" CR 
+ 
+   [CHAR] G 1+ [CHAR] A DO I EMIT SPACE LOOP CR 
+ 
+   ." YOU SHOULD SEE 0-5 SEPARATED BY TWO SPACES:" CR 
+ 
+   5 1+ 0 DO I [CHAR] 0 + EMIT 2 SPACES LOOP CR 
+ 
+   ." YOU SHOULD SEE TWO SEPARATE LINES:" CR 
+ 
+   S" LINE 1" TYPE CR S" LINE 2" TYPE CR 
+ 
+   ." YOU SHOULD SEE THE NUMBER RANGES OF SIGNED AND UNSIGNED NUMBERS:" CR 
+ 
+   ."   SIGNED: " MIN-INT . MAX-INT . CR 
+ 
+   ." UNSIGNED: " 0 U. MAX-UINT U. CR 
+ 
+; ok
+ ok
+ ok
+ ok
+T{ OUTPUT-TEST -> }T YOU SHOULD SEE THE STANDARD GRAPHIC CHARACTERS:
+ !"#$%&'()*+,-./0123456789:;<=>?@
+ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`
+abcdefghijklmnopqrstuvwxyz{|}~
+YOU SHOULD SEE 0-9 SEPARATED BY A SPACE:
+0 1 2 3 4 5 6 7 8 9 
+YOU SHOULD SEE 0-9 (WITH NO SPACES):
+0123456789
+YOU SHOULD SEE A-G SEPARATED BY A SPACE:
+A B C D E F G 
+YOU SHOULD SEE 0-5 SEPARATED BY TWO SPACES:
+0  1  2  3  4  5  
+YOU SHOULD SEE TWO SEPARATE LINES:
+LINE 1
+LINE 2
+YOU SHOULD SEE THE NUMBER RANGES OF SIGNED AND UNSIGNED NUMBERS:
+  SIGNED: -8000 7FFF 
+UNSIGNED: 0 FFFF 
+ok
+ ok
+ ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+\ TESTING INPUT: ACCEPT ok
+ ok
+\  ok
+ ok
+\ CREATE ABUF 80 CHARS ALLOT ok
+ ok
+\  ok
+ ok
+\ : ACCEPT-TEST ok
+ ok
+\    CR ." PLEASE TYPE UP TO 80 CHARACTERS:" CR ok
+ ok
+\    ABUF 80 ACCEPT ok
+ ok
+\    CR ." RECEIVED: " [CHAR] " EMIT ok
+ ok
+\    ABUF SWAP TYPE [CHAR] " EMIT CR ok
+ ok
+\ ; ok
+ ok
+\  ok
+ ok
+\ T{ ACCEPT-TEST -> }T ok
+ ok
+ ok
+ ok
+\ ------------------------------------------------------------------------ ok
+ ok
+TESTING DICTIONARY SEARCH RULES *ok
+ ok
+ ok
+ ok
+T{ : GDX   123 ; : GDX   GDX 234 ; -> }T ok
+ ok
+ ok
+ ok
+T{ GDX -> 123 234 }T ok
+ ok
+ ok
+ ok
+CR .( End of Core word set tests) CR 
+.(?
+ ok
+ ok
+ ok
+ ok
+ ok

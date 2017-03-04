@@ -1576,9 +1576,6 @@ scanmis: ; either match, or count exhausted
 ;       1+ LOOP DUP
 ;   THEN 2DROP 0 ;
 ; Harvard model: c-addr1=>Data, c-addr2=>Code.
-        .drw link
-        .set link,*+1
-        .db  0,2,"N="
 NEQUAL: push dr7
         push dr6
         mov r2,dpl      ; count
@@ -1608,18 +1605,14 @@ Nequloop: mov dph,r5    ; get Code char
         inc dptr
         mov r7,dph
         mov r6,dpl
-        clr c           ; Data-Code
-        subb a,r1
+        xrl a,r1
         jnz Nequfail
 Nequtest: djnz r2,Nequloop
         djnz r3,Nequloop
         mov dph,r3      ; strings match, r3=0,
         mov dpl,r3      ;  so make TOS=0
         sjmp Nequdone
-Nequfail: subb a,acc    ; -1 if cy set, 0 if clr
-        mov dph,a       ; (Data<Code) (Data>Code)
-        orl a,#1        ; TOS = FFFF or 0001
-        mov dpl,a
+Nequfail: mov dptr,#-1
 Nequdone: pop dr6
         pop dr7
         ret
@@ -3835,8 +3828,6 @@ COLD:
         lcall SWOP
         lcall CMOVE
 
-        lcall CR
-        lcall CR
         lcall XISQUOTE
        .DB 35,"8051 CamelForth v1.6  18 Aug 1999"
        .DB 0x0d,0x0a
