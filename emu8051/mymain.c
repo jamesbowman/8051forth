@@ -9,6 +9,9 @@ int uart_data;
 static void finish(struct em8051 *aCPU)
 {
   fprintf(stderr, "Cycles: %lu, %.3f ms\n", aCPU->cycles, 1000 * aCPU->cycles / 28e6);
+  FILE *dump = fopen("dump.bin", "wb");
+  fwrite(aCPU->mCodeMem, 32768, 1, dump);
+  fclose(dump);
   exit(0);
 }
 
@@ -48,6 +51,7 @@ int main(int argc, char *argv[])
 {
   struct em8051 emu;
   memset(&emu, 0, sizeof(emu));
+
   emu.mCodeMem     = malloc(65536);
   emu.mCodeMemSize = 65536;
   emu.mExtData     = emu.mCodeMem;
@@ -75,8 +79,13 @@ int main(int argc, char *argv[])
   emu.xread = NULL;
   emu.xwrite = NULL;
   reset(&emu, 1);
+  memset(emu.mCodeMem, 0xff, emu.mCodeMemSize);
 
-  load_obj(&emu, argv[2]);
+  int rc = load_obj(&emu, argv[2]);
+  if (rc < 0) {
+    fprintf(stderr, "load obj error %d\n", rc);
+    exit(1);
+  }
 
   int i;
   int trace = 0;

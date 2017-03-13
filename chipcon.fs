@@ -100,14 +100,14 @@ $af constant FWDATA
     repeat
     2drop drop ;
 
-sel $f400 MOV_DPTR# ramload
+sel $ff40 MOV_DPTR# ramload
 #include flashcopy.hex
 
 variable fpage 0 fpage !
 
 : flush ( -- )
     fpage @ MOV_DPTR#
-    $f400 SET_PC RESUME
+    $ff40 SET_PC RESUME
     1 ms
     BEGIN READ_STATUS $20 and until
 ;
@@ -136,7 +136,7 @@ variable fpage 0 fpage !
     2drop drop ;
 
 flashload
-#include cc0.hex
+#include cc0f.hex
 0 SET_PC RESUME
 
 \ Load ram part at $f000 and jump to it

@@ -149,6 +149,11 @@ reset:  mov ie,#0       ; disable all irpts
 
         .equ CLKCON,0xc6
 
+        .equ    _IDP    ,0x0a
+        .equ    _LATEST ,0x0c
+        .equ    RSP0,   0x20
+        .equ    S0,     0xff
+
         ;             76543210
         mov CLKCON,#0b10001000                  ; external crystal
         mov FWT,#0x2a                           ; flash write timer
@@ -159,8 +164,8 @@ reset:  mov ie,#0       ; disable all irpts
         mov U0BAUD,#34
 
         mov UP,#UPHI
-        mov r0,#0xff    ; param stack at FEFF
-        mov sp,#0x8     ; ret stack at bottom
+        mov r0,#S0      ; param stack at FEFF
+        mov sp,#RSP0
         ljmp COLD       ; enter Forth interpreter
 
 ; SERIAL I/O ====================================
@@ -199,34 +204,6 @@ QUERYKEY:
         mov a,scon      ; get rx flag in carry
         rrc a
         ajmp cyprop     ; propagate that thru TOS
-
-; DEBUG =========================================
-
-DOTX:
-        mov a,dph
-        acall dota
-        mov a,dpl
-        acall dota
-        ajmp DROP
-dota:
-        push acc
-        rr a
-        rr a
-        rr a
-        rr a
-        acall x1
-        pop acc
-x1:
-        anl a,#15
-        clr c
-        subb a,#0x0a
-        jc numeric
-        add a,#7
-numeric:
-        add a,#0x3a
-        acall DUP
-        mov dpl,a
-        sjmp EMIT
 
 ; LOOP FACTORS ==================================
 
@@ -527,11 +504,8 @@ RFETCH: dec r0          ; push old TOS
         .drw link
         .set link,*+1
         .db  0,3,"SP@"
-SPFETCH: dec r0          ; push old TOS
-        mov @r0,dph
-        dec r0
-        mov @r0,dpl
-        mov dph,UP       ; 16-bit pointer P2:R0
+SPFETCH: lcall DUP
+        mov dph,0xff     ; 16-bit pointer P2:R0
         mov dpl,r0
         ret
 
@@ -1068,7 +1042,7 @@ BL:     acall docon
         .db  0,5,"COUNT"
 COUNT:  movx a,@dptr
         inc dptr
-        acall DUP
+PUSHA:  acall DUP
         mov dpl,a
         mov dph,#0
         ret
@@ -1951,8 +1925,8 @@ TICKSOURCE: lcall douser
         .drw link
         .set link,*+1
         .db  0,6,"LATEST"
-LATEST: lcall douser
-        .drw 14
+LATEST: lcall docon
+        .drw 0xff00 + _LATEST
 
 ;Z HP       -- a-addr                HOLD pointer
 ;   16 USER HP
@@ -1975,15 +1949,8 @@ LP:     lcall douser
         .drw link
         .set link,*+1
         .db  0,3,"IDP"
-IDP:  lcall douser
-        .drw 20
-
-;Z S0       -- a-addr      end of parameter stack
-        .drw link
-        .set link,*+1
-        .db  0,2,"S0"
-S0:     lcall douser
-        .drw 0x0FF
+IDP:  lcall docon
+        .drw 0xff00 + _IDP
 
 ;X PAD       -- a-addr            user PAD buffer
 ;                         = end of hold area!
@@ -1999,14 +1966,6 @@ PAD:    lcall douser
         .db  0,2,"L0"
 L0:     lcall douser
         .drw 0x180
-
-;Z R0       -- a-addr         end of return stack
-; on the 8051 this is the init value of RSP (SP).
-        .drw link
-        .set link,*+1
-        .db  0,2,"R0"
-RP0:    lcall docon     ; note R0 is an 8051 reg!
-        .drw 8
 
 ;Z uinit    -- addr  initial values for user area
         .drw link
@@ -3216,8 +3175,7 @@ EVALUATE: lcall TICKSOURCE
 QUIT:   lcall L0
         lcall LP
         lcall STORE
-        lcall RP0
-        lcall RPSTORE
+        mov sp,#RSP0
         lcall LIT
         .drw 0x0
         lcall STATE
@@ -3244,8 +3202,7 @@ QUIT2:  lcall CR
         .drw link
         .set link,*+1
         .db 0,5,"ABORT"
-ABORT:  lcall S0
-        lcall SPSTORE
+ABORT:  mov r0,#S0
         sjmp QUIT   ; QUIT never returns
 
 ;Z ?ABORT   f c-addr u --       abort & print msg
@@ -3791,11 +3748,11 @@ MOVE2:  ret
         .drw link
         .set link,*+1
         .db 0,5,"DEPTH"
-DEPTH:  lcall SPFETCH
-        lcall S0
-        lcall SWOP
-        lcall MINUS
-        ljmp TWOSLASH
+DEPTH:  mov a,#S0
+        clr c
+        subb a,r0
+        rr a
+        ljmp PUSHA
 
 ;C ENVIRONMENT?  c-addr u -- false   system query
 ;                         -- i*x true
@@ -3807,6 +3764,145 @@ ENVIRONMENTQ: lcall TWODROP
         lcall LIT
         .drw 0x0
         ret
+
+; ===============================================
+; CamelForth for the Intel 8051
+; Primitive testing code
+;
+; This is the "minimal" test of the CamelForth
+; kernel.  It verifies the threading and nesting
+; mechanisms, the stacks, and the primitives
+;   DUP EMIT EXIT lit branch ONEPLUS.
+; It is particularly useful because it does not
+; use the DO..LOOP, multiply, or divide words,
+; and because it can be used on embedded CPUs.
+; The numeric display word .A is also useful
+; for testing the rest of the Core wordset.
+;
+; Much of this code has been retained because it
+; supports DUMP.  It can be deleted without
+; affecting the CamelForth kernel.  Be careful
+; not to delete the equates at the end of file.
+; ===============================================
+;
+;       Extra primitives for the testing code.
+;
+SWAB:   mov a,dph
+        mov dph,dpl
+        mov dpl,a
+        ret
+
+LO:     anl dpl,#0x0f
+        mov dph,#0
+        ret
+
+HI:     anl dpl,#0xf0
+        mov a,dpl
+        rr a
+        rr a
+        rr a
+        rr a
+        mov dpl,a
+        mov dph,#0
+        ret
+
+DOTHEX: mov a,dpl
+        clr c
+        subb a,#0x0a
+        jc numeric
+        add a,#7
+numeric: add a,#0x3a
+        mov dpl,a
+        lcall EMIT
+        ret
+
+DOTHH:  lcall DUP
+        lcall HI
+        lcall DOTHEX
+        lcall LO
+        lcall DOTHEX
+        ret
+;
+;       : .B ( a - a+1)  DUP C@ .HH 20 EMIT 1+ ;
+;
+DOTB:   lcall DUP
+        lcall CFETCH
+        lcall DOTHH
+        lcall lit
+        .drw 0x20
+        lcall EMIT
+        lcall ONEPLUS
+        ret
+;
+;       : .A ( a)  DUP SWAB .HH .HH 20 EMIT ;
+;
+DOTA:   lcall DUP
+        lcall SWAB
+        lcall DOTHH
+        lcall DOTHH
+        lcall lit
+        .drw 0x20
+        lcall EMIT
+        ret
+
+;
+;       : DUMP  ( a n -- )
+;               0 DO
+;                  CR DUP .A SPACE
+;                  .B .B .B .B  .B .B .B .B
+;                  .B .B .B .B  .B .B .B .B
+;               16 +LOOP DROP ;
+;
+        .drw link
+        .set link,*+1
+        .db 0,4,"DUMP"
+DUMP:   lcall LIT
+        .drw 0
+        lcall XDO
+dump1:  lcall CR
+        lcall DUP
+        lcall DOTA
+        lcall SPACE
+        lcall DOTB
+        lcall DOTB
+        lcall DOTB
+        lcall DOTB
+        lcall DOTB
+        lcall DOTB
+        lcall DOTB
+        lcall DOTB
+        lcall DOTB
+        lcall DOTB
+        lcall DOTB
+        lcall DOTB
+        lcall DOTB
+        lcall DOTB
+        lcall DOTB
+        lcall DOTB
+        lcall LIT
+        .drw 16
+        lcall xplusloop
+        jz dump1
+        lcall UNLOOP
+        lcall DROP
+        ret
+
+
+
+;C COMMIT    --
+        .drw link
+        .set link,*+1
+        .db 0,6,"COMMIT"
+COMMIT: lcall IDP
+        lcall lit
+        .drw INITBLK
+        lcall LIT
+        .drw 4
+        ljmp MOVE
+
+INITBLK:
+        .drw    CODEHERE
+        .drw    lastword
 
 ;Z COLD     --      cold start Forth system
 ;   UINIT U0 #INIT I->D      init user area
@@ -3823,10 +3919,17 @@ COLD:
         .drw 0,0        ; SOURCE init'd elsewhere
         .drw lastword   ; LATEST
         .drw 0,0        ; HP,LP init'd elsewhere
-        .drw coderam    ; IDP
+        .drw 0          ; unused
         lcall U0
         lcall SWOP
         lcall CMOVE
+
+        lcall lit
+        .drw INITBLK
+        lcall IDP
+        lcall LIT
+        .drw 4
+        lcall MOVE
 
         lcall XISQUOTE
        .DB 35,"8051 CamelForth v1.6  18 Aug 1999"
@@ -3834,22 +3937,8 @@ COLD:
         lcall ITYPE
         ljmp ABORT       ; ABORT never returns
 
-        lcall CR
-        lcall CR
-        lcall CR
-        lcall WORDS
-        lcall CR
-aa:
-        lcall KEY
-        lcall DOTX
-        lcall CR
-        sjmp aa
-        .db 0xa5
-        sjmp aa
-        nop
-
+CODEHERE:
 ; ===============================================
 ; Initial dictionary pointer for CamelForth.
 ; DO NOT delete!
     .equ lastword,link      ; NFA of final word
-
