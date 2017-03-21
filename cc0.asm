@@ -151,7 +151,8 @@ reset:  mov ie,#0       ; disable all irpts
 
         .equ    _IDP    ,0x0a
         .equ    _LATEST ,0x0c
-        .equ    RSP0,   0x20
+        .equ    WORDBUF ,0x0e
+        .equ    RSP0,   0x40
         .equ    S0,     0xff
 
         ;             76543210
@@ -1026,6 +1027,69 @@ TWOOVER: acall TOR
         acall RFROM
         ajmp TWOSWAP
 
+;C 2>R       x y --   R: -- x y   push to return stack
+        .drw link
+        .set link,*+1
+        .db  0,3,"2>R"
+TWOTOR: lcall SWOP
+        pop dr3         ; save ret addr in r3:r2
+        pop dr2
+        push dpl
+        push dph
+        lcall DROP
+        push dpl
+        push dph
+        push dr2        ; restore ret addr
+        push dr3
+        ljmp poptos     ; pop new TOS
+
+;C 2R>      -- x   R: x --  pop from return stack
+        .drw link
+        .set link,*+1
+        .db  0,3,"2R>"
+TWORFROM: pop dr3         ; save ret addr in r3:r2
+        pop dr2
+        lcall DUP
+        pop dph         ; pop hi byte
+        pop dpl         ; pop lo byte
+        lcall DUP
+        pop dph         ; pop hi byte
+        pop dpl         ; pop lo byte
+        lcall SWOP
+        push dr2        ; restore return address
+        push dr3
+        ret
+
+;Z D+       d d -- d         add double
+        .drw link
+        .set link,*+1
+        .db  0,2,"D+"
+DPLUS:  mov a,@r0       ; pop d.low -> r3:a
+        inc r0
+        mov dr3,@r0
+        inc r0
+
+        mov dr4,@r0     ; pop d.high-> r5:r4
+        inc r0
+        mov dr5,@r0
+        inc r0
+
+        add a,@r0
+        mov @r0,a
+        inc r0
+        mov a,@r0       ; d.low, high byte
+        addc a,r3
+        mov @r0,a
+        dec r0
+
+        mov a,dpl
+        addc a,r4
+        mov dpl,a
+        mov a,dph
+        addc a,r5
+        mov dph,a
+        ret
+
 ; INPUT/OUTPUT ==================================
 
 ;C BL      -- char                 an ASCII space
@@ -1554,14 +1618,12 @@ NEQUAL: push dr7
         push dr6
         mov r2,dpl      ; count
         mov r3,dph
-        mov dr4,@r0      ; get Code addr in r5:r4
-        inc r0
-        mov dr5,@r0
-        inc r0
-        mov dr6,@r0      ; get Data addr in r7:r6
-        inc r0
-        mov dr7,@r0
-        inc r0
+        lcall drop
+        mov dr4,dpl      ; get Code addr in r5:r4
+        mov dr5,dph
+        lcall drop
+        mov dr6,dpl      ; get Data addr in r7:r6
+        mov dr7,dph
         inc r3          ; adjust for djnz loop
         inc r2
         sjmp Nequtest
@@ -1590,6 +1652,7 @@ Nequfail: mov dptr,#-1
 Nequdone: pop dr6
         pop dr7
         ret
+
 
 ;         acall QDUP
 ;         acall zerosense
@@ -1668,7 +1731,7 @@ TOBODY: inc dptr
         .drw link
         .set link,*+1
         .db  0,8,"COMPILE,"
-COMMAXT: acall LIT
+COMMAXT: lcall LIT
         .drw 0x12
         lcall ICCOMMA
         lcall SWAPBYTES
@@ -1967,25 +2030,6 @@ PAD:    lcall douser
 L0:     lcall douser
         .drw 0x180
 
-;Z uinit    -- addr  initial values for user area
-        .drw link
-        .set link,*+1
-        .db  0,5,"UINIT"
-UINIT:  lcall dorom
-        .drw 0,0,10,0   ; reserved,>IN,BASE,STATE
-        .drw dataram    ; DP
-        .drw 0,0        ; SOURCE init'd elsewhere
-        .drw lastword   ; LATEST
-        .drw 0,0        ; HP,LP init'd elsewhere
-        .drw coderam    ; IDP
-
-;Z #init    -- n    #bytes of user area init data
-        .drw link
-        .set link,*+1
-        .db  0,5,"#INIT"
-NINIT:  lcall docon
-        .drw 22
-
 ; ARITHMETIC OPERATORS ==========================
 
 ;C S>D    n -- d           single -> double prec.
@@ -2199,7 +2243,7 @@ MAX:    lcall TWODUP
         lcall LESS
         lcall zerosense
         jz max1
-        lcall SWOP
+        ljmp NIP
 max1:   ljmp DROP
 
 ;C MIN    n1 n2 -- n3              signed minimum
@@ -2880,33 +2924,36 @@ IMMEDQ: lcall ONEMINUS
         .db 0,4,"FIND"
 FIND:
         movx a,@dptr
-        mov b,a
+        anl a,#31
+        mov WORDBUF,a
+        mov r2,a
+        add a,#WORDBUF
+        mov r1,a
+copyloop:
+        mov a,r2
+        movc a,@a+dptr
+        mov @r1,a
+        dec r1
+        djnz r2,copyloop
+
         lcall LATEST
-        lcall FETCH
+        sjmp FIND3
 FIND1:
         clr a
         movc a,@a+dptr
-        cjne a,b,FIND2
-        lcall TWODUP
-        lcall DUP
-        mov dpl,b
-        inc dpl
-        mov dph,#0
+        cjne a,WORDBUF,FIND2
 
-        lcall NEQUAL
-        lcall zerosense
-        jz FIND3
-FIND2:  mov a,dpl
-        add a,#-3
-        mov dpl,a
-        jc FIND7
-        dec dph
-FIND7:  lcall FETCH
-        orl a,dpl
-        jnz FIND1
-        ret
-
-FIND3:
+        mov r2,a
+        add a,#WORDBUF
+        mov r1,a
+cmploop:
+        mov a,r2
+        movc a,@a+dptr
+        xrl a,@r1
+        jnz FIND2
+        dec r1
+        djnz r2,cmploop
+        ;; Match found!
         lcall NIP
         lcall DUP
         lcall NFATOCFA
@@ -2916,6 +2963,23 @@ FIND3:
         lcall LIT
         .drw 1
         ljmp  OR
+FIND2:
+        mov a,dpl
+        add a,#-3
+        mov dpl,a
+        jc FIND3
+        dec dph
+FIND3:
+        movx a,@dptr    ; low byte
+        mov r2,a        ; ..temporary stash
+        inc dptr
+        movx a,@dptr    ; high byte
+        mov dpl,r2      ; copy to TOS (DPTR)
+        mov dph,a
+        jnz FIND1
+        orl a,r2
+        jnz FIND1
+        ret
 
 ;C LITERAL  x --           append numeric literal
 ;   STATE @ IF ['] LIT ,XT I, THEN ; IMMEDIATE

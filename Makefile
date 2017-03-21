@@ -10,4 +10,4 @@ $(EMU):
 	make -C emu8051
 
 %.hex: %.asm $(AS31)
-	$(ASM) $<
+	$(ASM) -l $<
