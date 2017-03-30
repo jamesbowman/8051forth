@@ -2903,6 +2903,43 @@ NFATOCFA: lcall ICOUNT
 IMMEDQ: lcall ONEMINUS
         ljmp CFETCH
 
+toupper:
+        add a,#-0x61
+        add a,#-26
+        jc toupper1
+        add a,#(0x61 + 26 - 32)
+        ret
+toupper1:
+        add a,#(0x61 + 26)
+        ret
+
+        .drw link
+        .set link,*+1
+        .db 0,1,"U"
+        mov a,dpl
+        lcall toupper
+        mov dpl,a
+        ret
+
+; towordbuf ( c-addr -- c-addr )
+; Copy counted string to WORDBUF, folding case
+
+towordbuf:
+        movx a,@dptr
+        anl a,#31
+        mov WORDBUF,a
+        mov r2,a
+        add a,#WORDBUF
+        mov r1,a
+copyloop:
+        mov a,r2
+        movc a,@a+dptr
+        lcall toupper
+        mov @r1,a
+        dec r1
+        djnz r2,copyloop
+        ret
+
 ;C FIND   c-addr -- c-addr 0   if not found
 ;C                  xt  1      if immediate
 ;C                  xt -1      if "normal"
@@ -2923,19 +2960,7 @@ IMMEDQ: lcall ONEMINUS
         .set link,*+1
         .db 0,4,"FIND"
 FIND:
-        movx a,@dptr
-        anl a,#31
-        mov WORDBUF,a
-        mov r2,a
-        add a,#WORDBUF
-        mov r1,a
-copyloop:
-        mov a,r2
-        movc a,@a+dptr
-        mov @r1,a
-        dec r1
-        djnz r2,copyloop
-
+        lcall towordbuf
         lcall LATEST
         sjmp FIND3
 FIND1:
