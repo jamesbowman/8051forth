@@ -151,7 +151,8 @@ reset:  mov ie,#0       ; disable all irpts
 
         .equ    _IDP    ,0x0a
         .equ    _LATEST ,0x0c
-        .equ    WORDBUF ,0x0e
+        .equ    _HANDLER,0x0e
+        .equ    WORDBUF ,0x10
         .equ    RSP0,   0x40
         .equ    S0,     0xff
 
@@ -205,6 +206,52 @@ QUERYKEY:
         mov a,scon      ; get rx flag in carry
         rrc a
         ajmp cyprop     ; propagate that thru TOS
+
+; EXCEPTIONS ====================================
+
+        .drw link
+        .set link,*+1
+        .db  0,5,"CATCH"
+CATCH:
+        lcall SPFETCH   ; SP@ >R         ( xt ) \ save data stack pointer
+        lcall TOR
+        lcall HANDLER   ; HANDLER @ >R   ( xt ) \ and previous handler
+        lcall FETCH
+        lcall TOR
+        lcall RPFETCH   ; RP@ HANDLER !  ( xt ) \ set current handler
+        lcall HANDLER
+        lcall STORE
+    
+        lcall EXECUTE   ; EXECUTE        ( )    \ execute returns if no THROW
+        lcall RFROM     ; R> HANDLER !   ( )    \ restore previous handler
+        lcall HANDLER
+        lcall STORE
+        lcall RFROM     ; R> DROP        ( )    \ discard saved stack ptr
+        lcall DROP
+        ljmp FALSE      ; 0              ( 0 )  \ normal completion
+
+        .drw link
+        .set link,*+1
+        .db  0,5,"THROW"
+THROW:
+        mov a,dpl
+        orl a,dph
+        jnz THROW1
+        ljmp DROP
+THROW1:
+        lcall HANDLER   ; HANDLER @ RP!  ( exc# ) \ restore prev return stack
+        lcall FETCH
+        lcall RPSTORE
+        lcall RFROM     ; R> HANDLER !   ( exc# ) \ restore prev handler
+        lcall HANDLER
+        lcall STORE
+        lcall RFROM     ; R> SWAP >R     ( saved-sp ) \ exc# on return stack
+        lcall SWOP
+        lcall TOR
+        lcall SPSTORE   ; SP! DROP R>    ( exc# ) \ restore stack
+        lcall DROP
+        lcall RFROM
+        ret
 
 ; LOOP FACTORS ==================================
 
@@ -522,12 +569,11 @@ SPSTORE: mov r0,dpl       ; set stack pointer
         .drw link
         .set link,*+1
         .db  0,3,"RP@"
-RPFETCH: dec r0          ; push old TOS
-        mov @r0,dph
-        dec r0
-        mov @r0,dpl
+RPFETCH: lcall DUP
         mov dph,#0       ; 16-bit pointer 00:SP
-        mov dpl,sp
+        mov acc,sp
+        add a,#-2
+        mov dpl,a
         ret
 
 ;Z RP!      a-addr --    set return stack pointer
@@ -2030,6 +2076,13 @@ PAD:    lcall douser
 L0:     lcall douser
         .drw 0x180
 
+;Z HANDLER   -- a-addr         last exception handler
+        .drw link
+        .set link,*+1
+        .db  0,7,"HANDLER"
+HANDLER: lcall docon
+        .drw 0xff00 + _HANDLER
+
 ; ARITHMETIC OPERATORS ==========================
 
 ;C S>D    n -- d           single -> double prec.
@@ -3240,8 +3293,7 @@ QUIT:   lcall L0
         lcall LP
         lcall STORE
         mov sp,#RSP0
-        lcall LIT
-        .drw 0x0
+        lcall FALSE
         lcall STATE
         lcall STORE
 QUIT1:  lcall TIB
