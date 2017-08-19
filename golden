@@ -1,12 +1,22 @@
 8051 CamelForth v1.6  18 Aug 1999
-: ALIGN ; ok
-: ALIGNED ; ok
+: align ; ok
+: aligned ; ok
  ok
-: CHARS ; ok
-: CHAR+ 1+ ; ok
+: chars ; ok
+: char+ 1+ ; ok
  ok
-: CELLS 2* ; ok
-: CELL+ 2 + ; ok
+: cells 2* ; ok
+: cell+ 2 + ; ok
+ ok
+: (.s) 
+    depth if 
+        >r recurse r> dup . 
+    then ; ok
+ ok
+: .s 
+    [char] [ emit space (.s) [char] ] emit 
+; ok
+ ok
 \ #noverbose ok
 \ ANS Forth tests - run all tests ok
  ok

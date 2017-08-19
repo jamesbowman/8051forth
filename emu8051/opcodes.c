@@ -846,13 +846,22 @@ static int orl_c_bitaddr(struct em8051 *aCPU)
 
 static int get_dptr(struct em8051 *aCPU)
 {
-  return ((aCPU->mSFR[REG_DPH0] << 8) | (aCPU->mSFR[REG_DPL0]));
+  if (aCPU->mSFR[REG_DPS] == 0) {
+    return ((aCPU->mSFR[REG_DPH0] << 8) | (aCPU->mSFR[REG_DPL0]));
+  } else {
+    return ((aCPU->mSFR[REG_DPH1] << 8) | (aCPU->mSFR[REG_DPL1]));
+  }
 }
 
 static void set_dptr(struct em8051 *aCPU, int v)
 {
-  aCPU->mSFR[REG_DPH0] = v >> 8;
-  aCPU->mSFR[REG_DPL0] = v;
+  if (aCPU->mSFR[REG_DPS] == 0) {
+    aCPU->mSFR[REG_DPH0] = v >> 8;
+    aCPU->mSFR[REG_DPL0] = v;
+  } else {
+    aCPU->mSFR[REG_DPH1] = v >> 8;
+    aCPU->mSFR[REG_DPL1] = v;
+  }
 }
 
 static int jmp_indir_a_dptr(struct em8051 *aCPU)
