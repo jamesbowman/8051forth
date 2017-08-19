@@ -915,6 +915,14 @@ is1:
         mov dptr,#0
         ret
 
+;C 0<>      n -- flag        true if TOS nonzero
+        .drw link
+        .set link,*+1
+        .db  0,3,"0<>"
+ZERONOTEQUAL:
+        lcall FALSE
+        ljmp NOTEQUAL
+
 ;C 0<       n -- flag        true if TOS negative
         .drw link
         .set link,*+1
@@ -2396,6 +2404,137 @@ ACC3:   lcall SWOP
         acall UMIN
 ACC4:   sjmp ACC1
 
+; From Forth200x - public domain
+
+isspace:                        ; ( c -- f )
+        lcall LIT
+        .drw 0x21
+        ljmp ULESS
+
+isnotspace:                     ; ( c -- f )
+        lcall isspace
+        ljmp ZEROEQUAL
+
+; : xt-skip   ( addr1 n1 xt -- addr2 n2 ) \ gforth
+;     \ skip all characters satisfying xt ( c -- f )
+;     >r
+;     BEGIN
+;         over c@ r@ execute
+;         overand
+;     WHILE
+;         1/string
+;     REPEAT
+;     rdrop ;
+
+xt_skip:
+        lcall TOR
+xt_skip0:
+        lcall OVER
+        lcall CFETCH
+        lcall RFETCH
+        lcall EXECUTE
+        lcall OVER
+        lcall AND
+        lcall zerosense
+        jz xt_skip1
+
+        lcall LIT
+        .drw 1
+        lcall SLASHSTRING
+        ljmp xt_skip0
+
+xt_skip1:
+        lcall RFROM
+        ljmp DROP
+
+; header parse-name
+; : parse-name ( "name" -- c-addr u )
+;     source >in @i /string
+;     ['] isspace? xt-skip over >r
+;     ['] isnotspace?
+; : _parse
+;     xt-skip ( end-word restlen r: start-word )
+;     2dup 0<> - sourceA @i - >in!
+;     drop r>
+;     tuck -
+; ;
+        .drw link
+        .set link,*+1
+        .db 0,10,"PARSE-NAME"
+
+PARSE_NAME:
+        lcall SOURCE
+        lcall TOIN
+        lcall FETCH
+        lcall SLASHSTRING
+
+        lcall LIT
+        .drw isspace
+        lcall xt_skip
+        lcall OVER
+        lcall TOR
+
+        lcall LIT
+        .drw isnotspace
+
+_parse:
+        lcall xt_skip
+
+        lcall TWODUP
+        lcall ZERONOTEQUAL
+        lcall MINUS
+        lcall SOURCE
+        lcall DROP
+        lcall MINUS
+        lcall TOIN
+        lcall STORE
+
+        lcall DROP
+        lcall RFROM
+
+        lcall TUCK
+        ljmp MINUS
+
+; : isnotdelim
+;     scratch @i <>
+; ;
+
+isnotdelim:
+        lcall DUP
+        mov dpl,b
+        mov dph,#0
+        ljmp NOTEQUAL
+
+; header parse
+; : parse ( "ccc<char" -- c-addr u )
+;     scratch _!
+;     source >in @i /string
+;     over >r
+;     ['] isnotdelim
+;     _parse
+; ;
+
+        .drw link
+        .set link,*+1
+        .db 0,5,"PARSE"
+
+PARSE:
+        mov b,dpl
+        lcall DROP
+
+        lcall SOURCE
+        lcall TOIN
+        lcall FETCH
+        lcall SLASHSTRING
+
+        lcall OVER
+        lcall TOR
+
+        lcall LIT
+        .drw isnotdelim
+
+        ljmp _parse
+
 ;Z (S")    -- c-addr u       run-time code for S"
 ;   R@ I@                     get Data address
 ;   R> CELL+ DUP IC@ CHAR+    -- Dadr Radr+2 n+1
@@ -2442,7 +2581,7 @@ ISQUOTE: lcall LIT
         lcall CFETCH
         lcall ONEPLUS
         ; lcall ALIGNED
-        ajmp IALLOT
+        ljmp IALLOT
 
 ;C S"       --             compile in-line string
 ;   COMPILE (S")  [ HEX ]
@@ -2457,17 +2596,17 @@ ISQUOTE: lcall LIT
 SQUOTE: lcall LIT
         .drw XSQUOTE
         lcall COMMAXT
-        acall HERE
-        acall ICOMMA
+        lcall HERE
+        lcall ICOMMA
         lcall LIT
         .drw 0x22
-        acall IWORD
+        lcall IWORD
         lcall CFETCH
         lcall ONEPLUS
         ; lcall ALIGNED
         lcall DUP
-        acall ALLOT
-        ajmp IALLOT
+        lcall ALLOT
+        ljmp IALLOT
 
 ;C ."       --            compile string to print
 ;   POSTPONE IS"  POSTPONE ITYPE ; IMMEDIATE
@@ -2521,7 +2660,24 @@ ITYP5:  ret
         .set link,*+1
         .db 0,5,"IWORD"
 IWORD:  lcall XWORD
-        acall IHERE
+        ; lcall towordbuf
+        ; lcall DROP
+        ; lcall LIT
+        ; .drw 0xff00+WORDBUF
+        lcall IHERE
+        lcall TUCK
+        lcall OVER
+        lcall CFETCH
+        inc dptr
+        ljmp CMOVE
+
+IWORD_W:
+        lcall XWORD
+        lcall towordbuf
+        lcall DROP
+        lcall LIT
+        .drw 0xff00+WORDBUF
+        lcall IHERE
         lcall TUCK
         lcall OVER
         lcall CFETCH
@@ -2764,18 +2920,18 @@ ALLOT:  acall DP
         .drw link
         .set link,*+1
         .db 0,1,","
-COMMA:  acall HERE
+COMMA:  lcall HERE
         lcall STORE
         lcall lit
         .drw 2
-        ajmp ALLOT
+        ljmp ALLOT
 
 ;C C,   char --               append char to dict
 ;   HERE C! 1 CHARS ALLOT ;
         .drw link
         .set link,*+1
         .db 0,2,"C,"
-CCOMMA: acall HERE
+CCOMMA: lcall HERE
         lcall CSTORE
         lcall lit
         .drw 1
@@ -2800,7 +2956,7 @@ CCOMMA: acall HERE
         .drw link
         .set link,*+1
         .db 0,5,"IHERE"
-IHERE:  acall IDP
+IHERE:  lcall IDP
         ljmp FETCH
 
 ;Z IALLOT   n --    allocate n bytes in Code dict
@@ -2808,7 +2964,7 @@ IHERE:  acall IDP
         .drw link
         .set link,*+1
         .db 0,6,"IALLOT"
-IALLOT: acall IDP
+IALLOT: lcall IDP
         ljmp PLUSSTORE
 
 ;Z I,   x --             append cell to Code dict
@@ -2816,7 +2972,7 @@ IALLOT: acall IDP
         .drw link
         .set link,*+1
         .db 0,2,"I,"
-ICOMMA: acall IHERE
+ICOMMA: lcall IHERE
         lcall STORE
         lcall lit
         .drw 2
@@ -2827,7 +2983,7 @@ ICOMMA: acall IHERE
         .drw link
         .set link,*+1
         .db 0,3,"IC,"
-ICCOMMA: acall IHERE
+ICCOMMA: lcall IHERE
         lcall CSTORE
         lcall lit
         .drw 1
@@ -2844,7 +3000,7 @@ ICCOMMA: acall IHERE
         .drw link
         .set link,*+1
         .db 0,6,"SOURCE"
-SOURCE: acall TICKSOURCE
+SOURCE: lcall TICKSOURCE
         ljmp TWOFETCH
 
 ;X /STRING  a u n -- a+n u-n          trim string
@@ -2981,6 +3137,7 @@ towordbuf:
         movx a,@dptr
         anl a,#31
         mov WORDBUF,a
+        jz towordbuf2
         mov r2,a
         add a,#WORDBUF
         mov r1,a
@@ -2991,6 +3148,7 @@ copyloop:
         mov @r1,a
         dec r1
         djnz r2,copyloop
+towordbuf2:
         ret
 
 ;C FIND   c-addr -- c-addr 0   if not found
@@ -3446,7 +3604,7 @@ CREATE: lcall LATEST
         lcall LATEST
         lcall STORE
         lcall BL
-        lcall IWORD
+        lcall IWORD_W
         lcall CFETCH
         lcall ONEPLUS
         lcall IALLOT
@@ -4029,6 +4187,71 @@ dump1:  lcall CR
         ret
 
 
+; RFST (0xE1) - RF Strobe Commands
+; RFTXRXIF is TCON.1
+
+        .equ    RFST,   0xe1
+        .equ    RFD,    0xd9
+
+radio_tx:
+C1:     jnb TCON.1,C1
+        clr TCON.1
+        mov RFD,a
+        ret
+
+        .drw link
+        .set link,*+1
+        .db 0,3,"ATX"
+ATX:
+        mov RFST,#03H ; Start TX with STX command strobe
+        mov a,#0x02
+        lcall radio_tx
+        mov a,dpl
+        lcall radio_tx
+        mov a,dph
+        lcall radio_tx
+        ljmp DROP
+
+        .drw link
+        .set link,*+1
+        .db 0,6,">RADIO"
+TO_RADIO:
+        mov RFST,#03H ; Start TX with STX command strobe
+        mov a,dpl
+        mov r1,a
+        lcall radio_tx
+        lcall DROP
+radioloop:
+        movx a,@dptr
+        lcall radio_tx
+        inc dptr
+        djnz r1,radioloop
+        ljmp DROP
+
+radio_rx:
+        jnb TCON.1,radio_rx
+        clr TCON.1
+        mov a,RFD
+        movx @dptr,a
+        inc dptr
+        ret
+
+        .drw link
+        .set link,*+1
+        .db 0,6,"RADIO>"
+RADIOFROM:
+        lcall DUP
+        mov RFST,#02h ; RFST_SRX
+        lcall radio_rx
+        mov r1,a
+ARX1:
+        lcall radio_rx
+        djnz r1,ARX1
+
+        mov RFST,#04h ; RFST_IDLE
+
+        lcall DROP
+        ljmp COUNT
 
 ;C COMMIT    --
         .drw link

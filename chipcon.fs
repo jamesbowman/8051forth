@@ -1,20 +1,21 @@
-\ PMOD pin:         3=GRN   2=YEL   1=ORA
-\ port $000 bit:    2       1       0     
-\                   ResetN  P2_2    P2_1
-new
+\ PMOD pin:         3=GRN   2=YEL   1=ORA           9=GRN   8=YEL   7=ORA
+\ port $000 bit:    2       1       0               6       5       4     
+\                   ResetN  P2_2    P2_1            ResetN  P2_2    P2_1
+new hex
 
-: input             6 2 io! ;
-: output            7 2 io! ;
+: input             $66 2 io! ;
+: output            $77 2 io! ;
 : out               1 io! ;
-: clock ( x -- )    dup 2 + out out ;
+: clock ( x -- )    dup $22 + out out ;
 
-: sel               input 4 out 0 out 0 clock 0 clock 4 out ;
+output $44 out 0 out 0 clock 0 clock $44 out \ init sequence
+input
 
 : send
-    output
+    output 8 lshift
     8 0 do
-        2* dup 8 rshift 1 and   \ extract MS bit
-        4 + clock               \ clock with ResetN high
+        dup 0< $11 and          \ extract MS bit as 00 or 11
+        $44 + clock 2*          \ clock with ResetN high
     loop
     drop ;
 
@@ -22,77 +23,43 @@ new
     input
     0
     8 0 do
-        4 clock
-        2* 1 io@ 1 and +
+        $44 clock
+        2* 1 io@ dup 2* 2* 2* 2* or $101 and +
     loop ;
 
-: discard recv drop ;
+: ignore                        recv drop ;
 : split         ( x -- lo hi )  dup 8 rshift ;
 : send16        ( x -- )        split send send ;
 
-: READ_STATUS   ( -- x )        $34 send  recv ;
-: WR_CONFIG     ( x -- )        $1d send  send discard ;
-: RD_CONFIG     ( -- x )        $24 send  recv ;
-: GET_CHIP_ID   ( -- id rev )   $68 send  recv recv ;
-: RESUME        ( -- )          $4c send discard ;
+: READ_STATUS   ( -- x )        $34 send recv ;
+: WR_CONFIG     ( x -- )        $1d send send ignore  ;
+: RD_CONFIG     ( -- x )        $24 send recv ;
+: GET_CHIP_ID   ( -- id rev )   $68 send recv recv ;
+: RESUME        ( -- )          $4c send ignore  ;
 : op                            $55 send send ;
 : 1op                           $56 send send ;
 : 2op                           $57 send send ;
-: DEBUG_INSTR1  ( op -- a )     $55 send  send        recv ;
-: DEBUG_INSTR2  ( a8 op -- a )  $56 send  send send   recv ;
-: DEBUG_INSTR3  ( a16 op -- a ) 2op send16 recv ;
 
-: MOV_A#        ( d16 -- )      $74 1op send discard ;
-: MOV_DPTR#     ( d8 -- )       $90 DEBUG_INSTR3 drop ;
-: INC_DPTR      ( -- )          $a3 DEBUG_INSTR1 drop ;
-: s!            ( v r -- )      $75 2op send send discard ;
-: s@            ( r -- x )      $e5 1op send recv ;
+GET_CHIP_ID .s
+
+: MOV_DPTR#     ( d8 -- )       $90 2op send16 ignore  ;
 : >XDATA        ( x -- )
-    MOV_A#
-    $f0 op discard              \ MOVX @DPTR,A
-    INC_DPTR ;
-: SET_PC        ( d16 - )       $02 2op send16 discard ;
+    $74 1op send ignore         \ MOV A,#x
+    $f0 op ignore               \ MOVX @DPTR,A
+    $a3 op ignore ;             \ INC DPTR
+: SET_PC        ( d16 - )       $02 2op send16 ignore  ;
 
-$ac constant FADDRL
-$ad constant FADDRH
-$ae constant FLC
-$af constant FWDATA
-
-: READ_CODE_MEMORY ( a u -- )
-    swap MOV_DPTR#
-    0 do
-        i 16 mod 0= if cr then
-        $e4 DEBUG_INSTR1 drop           \ CLR A
-        $93 DEBUG_INSTR1 .x2            \ MOVC A,@A+DPTR
-        INC_DPTR
-    loop ;
-
-: READ_XDATA_MEMORY ( a u -- )
-    swap MOV_DPTR#
-    0 do
-        i 16 mod 0= if cr then
-        $e0 DEBUG_INSTR1 .x2            \ MOVX A,@DPTR
-        INC_DPTR
-    loop ;
-
-: ?SFR $df80 $80 READ_XDATA_MEMORY ;
-
-: FADDR! ( a16 -- )             split FADDRH s! FADDRL s! ;
-
-: x sel begin READ_STATUS .x cr 1000 ms again ;
 : hh ( a u -- x a' ) 0. 2swap >number drop nip ;
 : 2h ( a   -- x a' ) 2 hh ;
 : 4h ( a   -- x a' ) 4 hh ;
-: ramload
-    hex
+: ramload                       \ copy Intel HEX records to DPTR
     begin
         pad dup 80 accept drop
-        1+ 2h 4h 2h         ( count addr fin a )
+        1+ 2h 4h 2h             ( count addr fin a )
         swap 0=
     while
-                            ( count addr a )
-        nip swap
-                            ( a count )
+                                ( count addr a )
+        nip swap                ( a count )
         0 ?do
             2h swap >XDATA
         loop
@@ -100,20 +67,32 @@ $af constant FWDATA
     repeat
     2drop drop ;
 
-sel $ff40 MOV_DPTR# ramload
+$ff40 MOV_DPTR# ramload
 #include flashcopy.hex
 
-variable fpage 0 fpage !
+GET_CHIP_ID drop                    \ xx01: lo present  01xx: hi present
+Dup  $00ff and $0001 = $00ff and    \ 00ff: lo present
+Swap $ff00 and $0100 = $ff00 and    \                   ff00: hi present
+Or constant present                 \ present is 0000, 00ff, ff00, or ffff
+: yesno ( f ) if ." YES" else ." NO" then ;
+Cr ." port 0 connected: " present $0001 and yesno
+Cr ." port 1 connected: " present $0100 and yesno
+
+: halted ( -- f ) \ are all present CPUs halted?
+    begin
+        READ_STATUS present invert or
+        $2020 and $2020 =
+    until ;
+
+Variable fpage 0 fpage !
 
 : flush ( -- )
     fpage @ MOV_DPTR#
     $ff40 SET_PC RESUME
     1 ms
-    BEGIN READ_STATUS $20 and until
-;
+    halted ;
 
 : flashload
-    hex
     begin
         pad dup 80 accept drop
         1+ 2h 4h 2h         ( count addr fin a )
@@ -135,13 +114,7 @@ variable fpage 0 fpage !
     flush
     2drop drop ;
 
-flashload
+Flashload
 #include cc0f.hex
 0 SET_PC RESUME
-
-\ Load ram part at $f000 and jump to it
-\ sel $f000 MOV_DPTR# ramload
-\ #include cc0.hex
-\ $f000 SET_PC RESUME
-
 #bye

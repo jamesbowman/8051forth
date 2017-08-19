@@ -60,12 +60,12 @@ void mem_memonic(int aValue, char *aBuffer)
             strcpy(aBuffer, "SP");
             done = 1;
             break;
-        case REG_DPL:
-            strcpy(aBuffer, "DPL");
+        case REG_DPL0:
+            strcpy(aBuffer, "DPL0");
             done = 1;
             break;
-        case REG_DPH:
-            strcpy(aBuffer, "DPH");
+        case REG_DPH0:
+            strcpy(aBuffer, "DPH0");
             done = 1;
             break;
         case REG_P0:
@@ -152,11 +152,11 @@ void bitaddr_memonic(int aValue, char *aBuffer)
         case REG_SP:
             strcpy(regname, "SP");
             break;
-        case REG_DPL:
-            strcpy(regname, "DPL");
+        case REG_DPL0:
+            strcpy(regname, "DPL0");
             break;
-        case REG_DPH:
-            strcpy(regname, "DPH");
+        case REG_DPH0:
+            strcpy(regname, "DPH0");
             break;
         case REG_P0:
             strcpy(regname, "P0");

@@ -1,5 +1,3 @@
-; ===============================================
-
         .org 0xff40
 
         .equ DPS,0x92
@@ -10,23 +8,6 @@
         .equ FADDRH,0xad
         .equ FLC,0xae
         .equ FWDATA,0xaf
-
-;        mov r6,#0
-;        mov FLC,#2      ; write
-;writeloop:
-;        movx a,@dptr
-;        inc dptr
-;        mov FWDATA,a
-;
-;        movx a,@dptr
-;        inc dptr
-;        mov FWDATA,a
-;
-;wait:   mov a,FLC
-;        jb acc.6,wait
-;
-;        djnz r6,writeloop
-;        .db 0xa5
 
         .equ U0CSR,0x86
         .equ U0UCR,0xc4
@@ -63,9 +44,7 @@
         mov a,FADDRH
         acall x2
 
-                                                ; DPTR is flash addr
-                                                ; MPAGE:r0 is RAM address
-        mov MPAGE,#0xf0
+        mov MPAGE,#0xf0                         ; MPAGE:r0 is RAM address
         mov r0,#0
         mov r2,#4
 compare:
@@ -92,9 +71,6 @@ mismatch:
         mov a,#0x2a
         acall tx
 
-        ; Erase page
-        ; mov FADDRL,#0
-        ; mov FADDRH,#0
 erasew0:mov a,FLC
         jb acc.7,erasew0
         mov FLC,#1      ; erase
@@ -120,7 +96,7 @@ writew: mov a,FLC
         jb acc.6,writew
         djnz r0,write
         djnz r1,write
-   .db 0xa5
+        .db 0xa5
 
 cr:
         mov a,#0x0a

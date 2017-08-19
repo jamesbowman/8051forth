@@ -844,9 +844,20 @@ static int orl_c_bitaddr(struct em8051 *aCPU)
     return 1;
 }
 
+static int get_dptr(struct em8051 *aCPU)
+{
+  return ((aCPU->mSFR[REG_DPH0] << 8) | (aCPU->mSFR[REG_DPL0]));
+}
+
+static void set_dptr(struct em8051 *aCPU, int v)
+{
+  aCPU->mSFR[REG_DPH0] = v >> 8;
+  aCPU->mSFR[REG_DPL0] = v;
+}
+
 static int jmp_indir_a_dptr(struct em8051 *aCPU)
 {
-    PC = ((aCPU->mSFR[REG_DPH] << 8) | (aCPU->mSFR[REG_DPL])) + ACC;
+    PC = get_dptr(aCPU) + ACC;
     return 1;
 }
 
@@ -1033,8 +1044,7 @@ static int mov_mem_indir_rx(struct em8051 *aCPU)
 
 static int mov_dptr_imm(struct em8051 *aCPU)
 {
-    aCPU->mSFR[REG_DPH] = OPERAND1;
-    aCPU->mSFR[REG_DPL] = OPERAND2;
+    set_dptr(aCPU, OPERAND1 << 8 | OPERAND2);
     PC += 3;
     return 1;
 }
@@ -1068,7 +1078,7 @@ static int mov_bitaddr_c(struct em8051 *aCPU)
 
 static int movc_a_indir_a_dptr(struct em8051 *aCPU)
 {
-    int address = ((aCPU->mSFR[REG_DPH] << 8) | (aCPU->mSFR[REG_DPL] << 0)) + ACC;
+    int address = get_dptr(aCPU) + ACC;
     ACC = aCPU->mCodeMem[address & (aCPU->mCodeMemSize - 1)];
     PC++;
     return 1;
@@ -1182,9 +1192,7 @@ static int mov_c_bitaddr(struct em8051 *aCPU)
 
 static int inc_dptr(struct em8051 *aCPU)
 {
-    aCPU->mSFR[REG_DPL]++;
-    if (!aCPU->mSFR[REG_DPL])
-        aCPU->mSFR[REG_DPH]++;
+    set_dptr(aCPU, get_dptr(aCPU) + 1);
     PC++;
     return 1;
 }
@@ -1614,7 +1622,7 @@ static int xchd_a_indir_rx(struct em8051 *aCPU)
 
 static int movx_a_indir_dptr(struct em8051 *aCPU)
 {
-    int dptr = (aCPU->mSFR[REG_DPH] << 8) | aCPU->mSFR[REG_DPL];
+    int dptr = get_dptr(aCPU);
     if (aCPU->xread)
     {
         ACC = aCPU->xread(aCPU, dptr);
@@ -1691,7 +1699,7 @@ static int mov_a_indir_rx(struct em8051 *aCPU)
 
 static int movx_indir_dptr_a(struct em8051 *aCPU)
 {
-    int dptr = (aCPU->mSFR[REG_DPH] << 8) | aCPU->mSFR[REG_DPL];
+    int dptr = get_dptr(aCPU);
     if (aCPU->xwrite)
     {
         aCPU->xwrite(aCPU, dptr, ACC);
