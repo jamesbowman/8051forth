@@ -1,5 +1,10 @@
-python times.py ; exit
-make &&
+# python times.py ; exit
+set -e
+
+make
+python setup.py build
+python unit.py
+exit
 ./emu /home/james/tmp/as31/camelforth/x.hex
 # cat runtests.fs - | ./emu /home/james/tmp/as31/camelforth/x.hex
 # cat bringup.fs - | ./emu /home/james/tmp/as31/camelforth/x.hex

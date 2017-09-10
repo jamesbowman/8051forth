@@ -83,7 +83,18 @@
         .equ dr5,0x05   ; POP instructions.
         .equ dr6,0x06   ; Assumes register bank 0
         .equ dr7,0x07   ; is selected.
-        .equ UP,0x08
+; FORTH EQUATES
+        .equ    UP      ,0x08   ; user pointer
+        .equ    _DP     ,0x0a   ; data pointer
+        .equ    _IDP    ,0x0c   ; code data pointer
+        .equ    _LATEST ,0x0e   ; last word defined
+        .equ    _HANDLER,0x10   ; last exception handler
+        .equ    _BASE   ,0x12   ; BASE
+        .equ    _MS     ,0x14   ; millisecond timer (32-bit)
+
+        .equ    WORDBUF ,0x20   ; scratch for FIND
+        .equ    RSP0    ,0x40   ; start of R stack
+        .equ    S0      ,0xff   ; start of D stack
 
 ; FORTH MEMORY MAP EQUATES
 ; Memory map:
@@ -104,38 +115,114 @@
 ; Double all except TIB and PAD for 32-bit CPUs.
 
 ; Initial RAM & ROM pointers for CamelForth.
-    .equ coderam,0x0e000    ; where new code goes
     .equ dataram,0x0f000    ; where data goes
     .equ UPHI,0xFD          ; Uarea at FE00 hex
 
         .org 0x0000
 ; RESET AND INTERRUPT VECTORS ===================
         ljmp reset
-;         ljmp ie0
-; ie0:    reti
-;         .skip 4
-;         ljmp clock ; ljmp tf0
-; tf0:    reti
-;         .skip 4
-;         ljmp ie1
-; ie1:    reti
-;         .skip 4
-;         ljmp tf1
-; tf1:    reti
-;         .skip 4
-;         ljmp riti
-; riti:   reti
-;         .skip 4
-;         ljmp tf2
-; tf2:    reti
-; 
-reset:  mov ie,#0       ; disable all irpts
 
+        .org 0x0003             ; 0     RFTXRX
+        ljmp nullintr
+
+        .org 0x000b             ; 1     ADC
+        ljmp nullintr
+
+        .org 0x0013             ; 2     USART0
+        ljmp nullintr
+
+        .org 0x001b             ; 3     USART1
+        ljmp nullintr
+
+        .org 0x0023             ; 4     ENC
+        ljmp nullintr
+
+        .org 0x002b             ; 5     ST
+        ljmp int_sleep
+
+        .org 0x0033             ; 6     P2INT
+        ljmp nullintr
+
+        .org 0x003b             ; 7     UTX0
+        ljmp nullintr
+
+        .org 0x0043             ; 8     DMA
+        ljmp nullintr
+
+        .org 0x004b             ; 9     T1
+        ljmp khz1
+
+        .org 0x0053             ; 10    T2
+        ljmp nullintr
+
+        .org 0x005b             ; 11    T3
+        ljmp nullintr
+
+        .org 0x0063             ; 12    T4
+        ljmp nullintr
+
+        .org 0x006b             ; 13    P0INT
+        ljmp nullintr
+
+        .org 0x0073             ; 14    UTX1
+        ljmp nullintr
+
+        .org 0x007b             ; 15    P1INT
+        ljmp nullintr
+
+        .org 0x0083             ; 16    RF
+        ljmp nullintr
+
+        .org 0x008b             ; 17    WDT
+        ljmp nullintr
+
+nullintr:
+        reti
+
+        .equ IRCON,0xc0
+        .equ T1CTL,0xe4
+
+int_sleep:
+        clr IRCON.7             ; STIF
+        reti
+
+khz1:
+        push acc
+
+        inc _MS+2
+        mov a,_MS+2
+        jnz donekhz
+
+        inc _MS+3
+        mov a,_MS+3
+        jnz donekhz
+
+        inc _MS+0
+        mov a,_MS+0
+        jnz donekhz
+
+        inc _MS+1
+
+donekhz:
+        mov a,T1CTL             ; Clear T1CTL.OVFIF
+        anl a,#0xef
+        mov T1CTL,a
+        ; mov IRCON,#2
+        clr IRCON.1
+        pop acc
+        reti
+
+        
+reset:  mov ie,#0x00       ; disable all irpts
+
+        .equ DPS,0x92
         .equ FWT,0xab
         .equ FADDRL,0xac
         .equ FADDRH,0xad
         .equ FLC,0xae
         .equ FWDATA,0xaf
+
+        .equ W0RTIME0,0xa5
 
         .equ U0CSR,0x86
         .equ U0UCR,0xc4
@@ -143,21 +230,15 @@ reset:  mov ie,#0       ; disable all irpts
         .equ U0DBUF,0xc1
         .equ U0BAUD,0xc2
 
+        .equ SLEEP, 0xbe
         .equ IRCON2,0xe8
         .equ P0DIR,0xfd
         .equ P0SEL,0xf3
 
         .equ CLKCON,0xc6
 
-        .equ    _IDP    ,0x0a
-        .equ    _LATEST ,0x0c
-        .equ    _HANDLER,0x0e
-        .equ    WORDBUF ,0x10
-        .equ    RSP0,   0x40
-        .equ    S0,     0xff
-
         ;             76543210
-        mov CLKCON,#0b10001000                  ; external crystal
+        mov CLKCON,#0b10000000                  ; external crystal
         mov FWT,#0x2a                           ; flash write timer
         mov P0SEL, #0b00001100                  ; UART0
         mov U0CSR, #0b11000000                  ; 8N1
@@ -1501,7 +1582,7 @@ FILL:   mov a,dpl       ; get char in A
         inc r0
         mov dr3,@r0
         inc r0
-        acall DROP
+        lcall DROP
         inc r3          ; adjust r3,r2 for djnz loop
         inc r2
         sjmp filltest
@@ -1509,7 +1590,7 @@ fillloop: movx @dptr,a
           inc dptr
 filltest: djnz r2,fillloop
           djnz r3,fillloop
-        ajmp poptos     ; pop new TOS
+        ljmp poptos     ; pop new TOS
 
 ;X CMOVE   c-addr1 c-addr2 u --  move from bottom
 ; as defined in the ANSI optional String word set
@@ -1524,24 +1605,24 @@ filltest: djnz r2,fillloop
         .drw link
         .set link,*+1
         .db  0,5,"CMOVE"
-CMOVE:  acall QDUP
-        acall zerosense
+CMOVE:  lcall QDUP
+        lcall zerosense
         jz cmove2
-        acall OVER
-        acall PLUS
-        acall SWOP
-        acall XDO
-cmove1: acall DUP
-        acall CFETCH
-        acall II
-        acall CSTORE
-        acall ONEPLUS
-        acall loopsense
+        lcall OVER
+        lcall PLUS
+        lcall SWOP
+        lcall XDO
+cmove1: lcall DUP
+        lcall CFETCH
+        lcall II
+        lcall CSTORE
+        lcall ONEPLUS
+        lcall loopsense
         jz cmove1
-        acall UNLOOP
-        acall DUP
-cmove2: acall DROP
-        ajmp DROP
+        lcall UNLOOP
+        lcall DUP
+cmove2: lcall DROP
+        ljmp DROP
 
 ;X CMOVE>  c-addr1 c-addr2 u --  move from top
 ; as defined in the ANSI optional String word set
@@ -1555,31 +1636,31 @@ cmove2: acall DROP
         .drw link
         .set link,*+1
         .db  0,6,"CMOVE>"
-CMOVEUP: acall QDUP
-        acall zerosense
+CMOVEUP: lcall QDUP
+        lcall zerosense
         jz cmovu2
-        acall ONEMINUS
-        acall ROT
-        acall OVER
-        acall PLUS
-        acall ROT
-        acall ROT
-        acall OVER
-        acall PLUS
-        acall XDO
-cmovu1: acall DUP
-        acall CFETCH
-        acall II
-        acall CSTORE
-        acall ONEMINUS
-        acall LIT
+        lcall ONEMINUS
+        lcall ROT
+        lcall OVER
+        lcall PLUS
+        lcall ROT
+        lcall ROT
+        lcall OVER
+        lcall PLUS
+        lcall XDO
+cmovu1: lcall DUP
+        lcall CFETCH
+        lcall II
+        lcall CSTORE
+        lcall ONEMINUS
+        lcall LIT
         .drw -1
-        acall pluslpsense
+        lcall pluslpsense
         jz cmovu1
-        acall UNLOOP
-        acall DUP
-cmovu2: acall DROP
-        ajmp DROP
+        lcall UNLOOP
+        lcall DUP
+cmovu2: lcall DROP
+        ljmp DROP
 
 ;Z SKIP   c-addr u c -- c-addr' u'
 ;Z                          skip matching chars
@@ -2010,8 +2091,8 @@ TOIN:   lcall douser
         .drw link
         .set link,*+1
         .db  0,4,"BASE"
-BASE:   lcall douser
-        .drw 4
+BASE:   lcall docon
+       .drw 0xff00 + _BASE
 
 ;C STATE   -- a-addr         holds compiler state
 ;  6 USER STATE
@@ -2026,8 +2107,8 @@ STATE:  lcall douser
         .drw link
         .set link,*+1
         .db  0,2,"DP"
-DP:     lcall douser
-        .drw 8
+DP:     lcall docon
+        .drw 0xff00 + _DP
 
 ;Z 'SOURCE  -- a-addr        two cells: len, adrs
 ; 10 USER 'SOURCE
@@ -2066,7 +2147,11 @@ LP:     lcall douser
         .drw link
         .set link,*+1
         .db  0,3,"IDP"
-IDP:  lcall docon
+IDP:
+        mov a,_IDP
+        orl a,_IDP+1
+        jz DP
+        lcall docon
         .drw 0xff00 + _IDP
 
 ;X PAD       -- a-addr            user PAD buffer
@@ -2090,6 +2175,16 @@ L0:     lcall douser
         .db  0,7,"HANDLER"
 HANDLER: lcall docon
         .drw 0xff00 + _HANDLER
+
+; TIME ==========================================
+
+        .drw link
+        .set link,*+1
+        .db  0,3,"MS@"
+MSFETCH:
+        lcall LIT
+        .drw 0xff00 + _MS
+        ljmp TWOFETCH
 
 ; ARITHMETIC OPERATORS ==========================
 
@@ -2794,9 +2889,9 @@ NUMS1:
         .set link,*+1
         .db 0,2,"#>"
 NUMGREATER: lcall TWODROP
-        acall HP
+        lcall HP
         lcall FETCH
-        acall PAD
+        lcall PAD
         lcall OVER
         ljmp MINUS
 
@@ -2810,7 +2905,7 @@ SIGN:   lcall ZEROLESS
         jz SIGN1
         lcall LIT
         .drw 0x2D
-        acall HOLD
+        lcall HOLD
 SIGN1:  ret
 
 ;C D.R  d n --
@@ -2847,7 +2942,7 @@ DDOT:   lcall FALSE
         .drw link
         .set link,*+1
         .db 0,1,"."
-        acall STOD
+        lcall STOD
         sjmp DDOT
 
 ;C u.  ( u -- )
@@ -2864,7 +2959,7 @@ UDOT:   lcall FALSE
         .set link,*+1
         .db 0,2,".R"
 DOTR:   lcall TOR
-        acall STOD
+        lcall STOD
         lcall RFROM
         sjmp DDOTR
 
@@ -2884,7 +2979,7 @@ UDOTR:  lcall FALSE
         .db 0,7,"DECIMAL"
 DECIMAL: lcall LIT
         .drw 10
-        acall BASE
+        lcall BASE
         ljmp STORE
 
 ;X HEX     --              set number base to hex
@@ -2894,7 +2989,7 @@ DECIMAL: lcall LIT
         .db 0,3,"HEX"
 HEX:    lcall LIT
         .drw 16
-        acall BASE
+        lcall BASE
         ljmp STORE
 
 ; DICTIONARY MANAGEMENT =========================
@@ -2904,7 +2999,7 @@ HEX:    lcall LIT
         .drw link
         .set link,*+1
         .db 0,4,"HERE"
-HERE:   acall DP
+HERE:   lcall DP
         ljmp FETCH
 
 ;C ALLOT   n --          allocate n bytes in dict
@@ -2912,7 +3007,7 @@ HERE:   acall DP
         .drw link
         .set link,*+1
         .db 0,5,"ALLOT"
-ALLOT:  acall DP
+ALLOT:  lcall DP
         ljmp PLUSSTORE
 
 ;C ,    x --                  append cell to dict
@@ -3057,7 +3152,8 @@ TOCOUNTED: lcall TWODUP
         .drw link
         .set link,*+1
         .db 0,4,"WORD"
-XWORD:  lcall DUP
+XWORD:  
+        lcall DUP
         lcall SOURCE
         lcall TOIN
         lcall FETCH
@@ -3242,7 +3338,11 @@ LITER1: ret
         .drw link
         .set link,*+1
         .db 0,6,"DIGIT?"
-DIGITQ: lcall DUP
+DIGITQ: 
+        mov a,dpl
+        lcall toupper
+        mov dpl,a
+        lcall DUP
         lcall LIT
         .drw 0x39
         lcall GREATER
@@ -3960,11 +4060,11 @@ QDO:    lcall LIT
 ENDLOOP: lcall COMMABRANCH
         lcall COMMADEST
         lcall COMMAUNLOOP       ; new on 8051!
-LOOP1:  acall LFROM
+LOOP1:  lcall LFROM
         lcall QDUP
         lcall zerosense
         jz LOOP2
-        acall THEN
+        lcall THEN
         sjmp LOOP1
 LOOP2:  ret
 
@@ -4002,7 +4102,7 @@ LEAVE:  lcall LIT
         lcall IHERE
         lcall DUP
         lcall COMMADEST
-        ajmp TOL
+        ljmp TOL
 
 ; OTHER OPERATIONS ==============================
 
@@ -4083,109 +4183,170 @@ ENVIRONMENTQ: lcall TWODROP
 ; affecting the CamelForth kernel.  Be careful
 ; not to delete the equates at the end of file.
 ; ===============================================
-;
-;       Extra primitives for the testing code.
-;
+
+        .drw link
+        .set link,*+1
+        .db 0,2,"><"
 SWAB:   mov a,dph
         mov dph,dpl
         mov dpl,a
         ret
 
-LO:     anl dpl,#0x0f
-        mov dph,#0
-        ret
-
-HI:     anl dpl,#0xf0
+HEX2:   lcall DUP
         mov a,dpl
-        rr a
-        rr a
-        rr a
-        rr a
-        mov dpl,a
-        mov dph,#0
-        ret
-
-DOTHEX: mov a,dpl
-        clr c
-        subb a,#0x0a
-        jc numeric
+        swap a
+        acall HEX1
+        mov a,dpl
+HEX1:   anl a,#0x0f
+        add a,#-0x0a
+        jnc numeric
         add a,#7
 numeric: add a,#0x3a
         mov dpl,a
-        lcall EMIT
-        ret
+        ljmp EMIT
 
-DOTHH:  lcall DUP
-        lcall HI
-        lcall DOTHEX
-        lcall LO
-        lcall DOTHEX
-        ret
-;
-;       : .B ( a - a+1)  DUP C@ .HH 20 EMIT 1+ ;
-;
-DOTB:   lcall DUP
-        lcall CFETCH
-        lcall DOTHH
-        lcall lit
-        .drw 0x20
-        lcall EMIT
-        lcall ONEPLUS
-        ret
-;
-;       : .A ( a)  DUP SWAB .HH .HH 20 EMIT ;
-;
-DOTA:   lcall DUP
-        lcall SWAB
-        lcall DOTHH
-        lcall DOTHH
-        lcall lit
-        .drw 0x20
-        lcall EMIT
-        ret
-
-;
-;       : DUMP  ( a n -- )
-;               0 DO
-;                  CR DUP .A SPACE
-;                  .B .B .B .B  .B .B .B .B
-;                  .B .B .B .B  .B .B .B .B
-;               16 +LOOP DROP ;
-;
         .drw link
         .set link,*+1
-        .db 0,4,"DUMP"
-DUMP:   lcall LIT
-        .drw 0
-        lcall XDO
-dump1:  lcall CR
+        .db 0,3,".X2"
+DOTX2:  lcall HEX2
+        ljmp SPACE
+
+        .drw link
+        .set link,*+1
+        .db 0,2,".X"
+DOTX:   lcall DUP
+        lcall SWAB
+        lcall HEX2
+        lcall HEX2
+        ljmp SPACE
+
+; regspec is a register specifier
+; All registers are in page DFxx
+;
+; +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+; |        offset         |     | hibit  | lobit  |
+; +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+;
+
+        .drw link
+        .set link,*+1
+        .db 0,2,"B@"
+BFETCH:
+        push dpl
+        mov a,dph
+        jb acc.7,BFETCH_1
+        mov dpl,a
+        mov dph,#0xdf
+        movx a,@dptr
+        mov b,a
+        mov a,#b
+BFETCH_1:
+        mov dptr,#bfetch_p0
+        movx @dptr,a
+        pop acc
+        mov r1,a                ; r1 is 6-bit hi:lo
+        anl a,#7
+        mov r2,a                ; r2 is 3-bit lo
+        ljmp bfetch_
+
+        .drw link
+        .set link,*+1
+        .db 0,2,"B!"
+BSTORE:
+        mov r1,dpl
+        mov a,dph
+        jb acc.7,BSTORE_1
+        mov dpl,a
+        mov dph,#0xdf
+        push dph
+        push dpl
+        movx a,@dptr
+        mov b,a
+        mov a,#b
+        acall BSTORE_1
         lcall DUP
-        lcall DOTA
-        lcall SPACE
-        lcall DOTB
-        lcall DOTB
-        lcall DOTB
-        lcall DOTB
-        lcall DOTB
-        lcall DOTB
-        lcall DOTB
-        lcall DOTB
-        lcall DOTB
-        lcall DOTB
-        lcall DOTB
-        lcall DOTB
-        lcall DOTB
-        lcall DOTB
-        lcall DOTB
-        lcall DOTB
-        lcall LIT
-        .drw 16
-        lcall xplusloop
-        jz dump1
-        lcall UNLOOP
-        lcall DROP
+        pop dpl
+        pop dph
+        mov a,b
+        movx @dptr,a
+        ljmp DROP
+
+BSTORE_1:
+        mov dptr,#bstore_p0
+        movx @dptr,a
+        mov dptr,#bstore_p1
+        movx @dptr,a
+        ljmp bstore_
+
+        ; The PHANTOM code block here is not actually executed
+        ; in flash. Instead it is copied into RAM, and executed
+        ; there. So it must avoid external relative jumps,
+        ; i.e. acall and ajmp.
+
+PHANTOM:
+        .equ bfetch_,dataram + (* - PHANTOM)
+        mov a,P0
+        .equ bfetch_p0,dataram + (* - 1 - PHANTOM)
+        mov r3,a                ; r3 is fetched value
+ 
+        mov dptr,#bmasks        ; mask r3
+        mov a,r1
+        movc a,@a+dptr
+        anl a,r3
+ 
+        inc r2
+        sjmp bfetch1
+bfetch0:
+        rr a
+bfetch1:
+        djnz r2,bfetch0
+        mov dph,#0
+        mov dpl,a
         ret
 
+        .equ bstore_,dataram + (* - PHANTOM)
+        mov a,r1                ; r1 is 6-bit hi:lo
+        anl a,#7
+        mov r2,a                ; r2 is 3-bit lo
+        mov a,P0
+        .equ bstore_p0,dataram + (* - 1 - PHANTOM)
+        mov r3,a                ; r3 is old value
+        
+        mov a,@r0               ; r5 is new value, shifted
+        inc r2
+        sjmp bstore1
+bstore0:
+        rl a
+bstore1:
+        djnz r2,bstore0
+        mov r5,a
+
+        mov DPS,#1              ; {
+        mov dptr,#bmasks        ; mask into r4
+        mov a,r1
+        movc a,@a+dptr
+        mov r4,a
+        mov DPS,#0              ; }
+
+        mov a,r5
+        xrl a,r3
+        anl a,r4
+        xrl a,r3
+
+        mov P0,a
+        .equ bstore_p1,dataram + (* - 1 - PHANTOM)
+        ljmp TWODROP
+        .equ PHANTOM_SIZE,*-PHANTOM
+
+bmasks:
+        .db     1,0,0,0,0,0,0,0
+        .db     3,2,0,0,0,0,0,0
+        .db     7,6,4,0,0,0,0,0
+        .db     15,14,12,8,0,0,0,0
+        .db     31,30,28,24,16,0,0,0
+        .db     63,62,60,56,48,32,0,0
+        .db     127,126,124,120,112,96,64,0
+        .db     255,254,252,248,240,224,192,128
 
 ; RFST (0xE1) - RF Strobe Commands
 ; RFTXRXIF is TCON.1
@@ -4253,20 +4414,46 @@ ARX1:
         lcall DROP
         ljmp COUNT
 
+INITBLK:
+        .drw    dataram+80      ; DP
+        .drw    CODEHERE        ; IDP
+        .drw    lastword        ; LATEST
+        .drw    0               ; HANDLER
+        .drw    10              ; BASE
+        .drw    0,0             ; MS
+        .equ    INITBLKSIZE,*-INITBLK
+INITB:                          ; ( -- a u ) \ return init block
+        lcall lit
+        .drw INITBLK
+        lcall LIT
+        .drw INITBLKSIZE
+        ret
+
 ;C COMMIT    --
         .drw link
         .set link,*+1
         .db 0,6,"COMMIT"
-COMMIT: lcall IDP
-        lcall lit
-        .drw INITBLK
-        lcall LIT
-        .drw 4
+COMMIT: lcall DP
+        lcall INITB
         ljmp MOVE
 
-INITBLK:
-        .drw    CODEHERE
-        .drw    lastword
+        .drw link
+        .set link,*+1
+        .db 0,9,"SLEEPMODE"     ; sleepmode ( m -- ) \ go into mode m
+SLEEPMODE:
+        mov ie,#0xa0
+        mov a,W0RTIME0
+        cjne a,W0RTIME0,sleepmode1
+sleepmode1:
+        mov a,dpl
+        orl a,#4
+        mov SLEEP,a
+        nop
+        nop
+        nop
+        mov PCON,#1
+        nop
+        ljmp DROP
 
 ;Z COLD     --      cold start Forth system
 ;   UINIT U0 #INIT I->D      init user area
@@ -4288,11 +4475,17 @@ COLD:
         lcall SWOP
         lcall CMOVE
 
-        lcall lit
-        .drw INITBLK
-        lcall IDP
         lcall LIT
-        .drw 4
+        .drw PHANTOM
+        lcall LIT
+        .drw dataram
+        lcall LIT
+        .drw PHANTOM_SIZE
+        lcall MOVE
+
+        lcall INITB
+        lcall DP
+        lcall SWOP
         lcall MOVE
 
         lcall XISQUOTE

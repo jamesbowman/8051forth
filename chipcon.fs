@@ -40,8 +40,6 @@ input
 : 1op                           $56 send send ;
 : 2op                           $57 send send ;
 
-GET_CHIP_ID .s
-
 : MOV_DPTR#     ( d8 -- )       $90 2op send16 ignore  ;
 : >XDATA        ( x -- )
     $74 1op send ignore         \ MOV A,#x
@@ -75,8 +73,8 @@ Dup  $00ff and $0001 = $00ff and    \ 00ff: lo present
 Swap $ff00 and $0100 = $ff00 and    \                   ff00: hi present
 Or constant present                 \ present is 0000, 00ff, ff00, or ffff
 : yesno ( f ) if ." YES" else ." NO" then ;
-Cr ." port 0 connected: " present $0001 and yesno
-Cr ." port 1 connected: " present $0100 and yesno
+." port 0 connected: " present $0001 and yesno cr
+." port 1 connected: " present $0100 and yesno cr
 
 : halted ( -- f ) \ are all present CPUs halted?
     begin
@@ -117,4 +115,11 @@ Variable fpage 0 fpage !
 Flashload
 #include cc0f.hex
 0 SET_PC RESUME
+
+0 2 io!                         \ tristate the debug bus
+
+: reset
+    output 0 out $44 out 
+    0 2 io! ;                       \ tristate the debug bus
+
 #bye
