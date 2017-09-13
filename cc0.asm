@@ -2464,7 +2464,12 @@ UMAX1:  ljmp DROP
         .drw link
         .set link,*+1
         .db 0,6,"ACCEPT"
-ACCEPT: lcall OVER
+ACCEPT:
+        lcall LIT
+        .drw 30
+        lcall EMIT
+
+        lcall OVER
         lcall PLUS
         lcall ONEMINUS
         lcall OVER
@@ -2875,7 +2880,7 @@ NUM:    acall BASE
         .db 0,2,"#S"
 NUMS:
 NUMS1:
-        acall NUM
+        lcall NUM
         lcall TWODUP
         lcall OR
         lcall ZEROEQUAL
