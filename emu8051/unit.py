@@ -11,6 +11,7 @@ class DUT:
         self.e = emu8051.emu8051()
         self.e.setrw(self.writer, self.reader)
         self.uart_out = []
+        self.uart_in = "1 TTH !" + '\r\n'
         print repr(self.frob())
 
     def writer(self, reg, val):

@@ -91,6 +91,7 @@
         .equ    _HANDLER,0x10   ; last exception handler
         .equ    _BASE   ,0x12   ; BASE
         .equ    _MS     ,0x14   ; millisecond timer (32-bit)
+        .equ    _TTH    ,0x18   ; TTH - tethered
 
         .equ    WORDBUF ,0x20   ; scratch for FIND
         .equ    RSP0    ,0x40   ; start of R stack
@@ -2186,6 +2187,12 @@ MSFETCH:
         .drw 0xff00 + _MS
         ljmp TWOFETCH
 
+        .drw link
+        .set link,*+1
+        .db  0,3,"TTH"
+TTH:    lcall docon
+        .drw 0xff00 + _TTH
+
 ; ARITHMETIC OPERATORS ==========================
 
 ;C S>D    n -- d           single -> double prec.
@@ -2465,10 +2472,12 @@ UMAX1:  ljmp DROP
         .set link,*+1
         .db 0,6,"ACCEPT"
 ACCEPT:
-        lcall LIT
+        mov a,_TTH
+        jz ACC0
+        lcall LIT                       ; xxx tethered
         .drw 30
         lcall EMIT
-
+ACC0:
         lcall OVER
         lcall PLUS
         lcall ONEMINUS
@@ -2868,9 +2877,9 @@ TODIGIT: lcall DUP
         .db 0,1,"#"
 NUM:    acall BASE
         lcall FETCH
-        acall UDSLASHMOD
+        lcall UDSLASHMOD
         lcall ROT
-        acall TODIGIT
+        lcall TODIGIT
         sjmp HOLD
 
 ;C #S    ud1 -- ud2      convert remaining digits
@@ -4035,7 +4044,7 @@ DO:     lcall LIT
         lcall IHERE
         lcall LIT
         .drw 0x0
-        ajmp TOL
+        ljmp TOL
 
 ;C ?DO      -- adrs   L: -- 0
 ;   ['] qbranch ,BRANCH  IHERE DUP ,DEST ;
@@ -4426,6 +4435,7 @@ INITBLK:
         .drw    0               ; HANDLER
         .drw    10              ; BASE
         .drw    0,0             ; MS
+        .drw    0               ; TTH
         .equ    INITBLKSIZE,*-INITBLK
 INITB:                          ; ( -- a u ) \ return init block
         lcall lit
