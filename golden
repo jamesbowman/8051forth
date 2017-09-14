@@ -366,8 +366,6 @@ T{ -1 1 < -> <TRUE> }T ok
  ok
 T{ MIN-INT 0 < -> <TRUE> }T ok
  ok
-MIN-INT U. MAX-INT U. 8000 7FFF ok
- ok
 T{ MIN-INT MAX-INT < -> <TRUE> }T ok
  ok
 T{ 0 MAX-INT < -> <TRUE> }T ok
@@ -1644,9 +1642,6 @@ TESTING EVALUATE *ok
  ok
 : GE1 S" 123" ; IMMEDIATE ok
  ok
-GE1 TYPE CR  123
-ok
- ok
 : GE2 S" 123 1+" ; IMMEDIATE ok
  ok
 : GE3 S" : GE4 345 ;" ; ok
@@ -2124,7 +2119,8 @@ T{ GDX -> 123 234 }T ok
  ok
  ok
 CR .( End of Core word set tests) CR 
-.(?
+End of Core word set tests
+ok
  ok
  ok
  ok

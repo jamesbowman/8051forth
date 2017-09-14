@@ -62,12 +62,11 @@ def collect_screenshot(dest, ser):
     # ser.write(b'k')
     # ser.flush()
 
-class TetheredTarget:
-    verbose = True
+class ForthShell:
+    verbose = False
     cellsize = 4
 
-    def __init__(self, port):
-        self.open_ser(port, 115200)
+    def start(self):
         self.searchpath = ['.']
         self.log = open("log", "w")
         self.interpreting = True
@@ -154,8 +153,10 @@ class TetheredTarget:
                     r = self.command_response(l)
                     if r.startswith(' '):
                         r = r[1:]
-                    if r.endswith(' ok\r\n'):
-                        r = r[:-5]
+                    if r.endswith('ok'):
+                        r = r[:-2]
+                    if r.endswith('ok\r\n'):
+                        r = r[:-4]
                     if 'error: ' in r:
                         print('--- ERROR ---')
                         sys.stdout.write(l + '\n')
@@ -174,7 +175,6 @@ class TetheredTarget:
         return [int(x, 36) for x in l.split()[:-1]]
 
     def shellcmd(self, cmd):
-        ser = self.ser
         if cmd.startswith('#noverbose'):
             self.verbose = False
         elif cmd.startswith('#include'):
@@ -328,7 +328,6 @@ class TetheredTarget:
             readline.set_completer(completer)
             readline.set_completer_delims(' ')
 
-        ser = self.ser
         while True:
             try:
                 if self.interpreting:
@@ -345,7 +344,7 @@ class TetheredTarget:
                 self.texlog(r"\end{framed}" + '\n')
                 break
 
-def main(Tethered):
+def main(Shell):
     port = '/dev/ttyUSB0'
     image = None
 
@@ -366,7 +365,7 @@ def main(Tethered):
             args = args[2:]
         else:
             if not r:
-                r = Tethered(port)
+                r = Shell(port)
                 r.boot(image)
                 r.searchpath += searchpath
             if a.startswith('-e'):
@@ -379,7 +378,7 @@ def main(Tethered):
                     pass
                 args = args[1:]
     if not r:
-        r = Tethered(port)
+        r = Shell(port)
         r.boot(image)
         r.searchpath += searchpath
     r.shell()

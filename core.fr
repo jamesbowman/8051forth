@@ -131,7 +131,6 @@ T{ 1 2 < -> <TRUE> }T
 T{ -1 0 < -> <TRUE> }T
 T{ -1 1 < -> <TRUE> }T
 T{ MIN-INT 0 < -> <TRUE> }T
-MIN-INT U. MAX-INT U.
 T{ MIN-INT MAX-INT < -> <TRUE> }T
 T{ 0 MAX-INT < -> <TRUE> }T
 T{ 0 0 < -> <FALSE> }T
@@ -770,7 +769,6 @@ T{ W1 -> HERE 2 + }T
 TESTING EVALUATE
 
 : GE1 S" 123" ; IMMEDIATE
-GE1 TYPE CR 
 : GE2 S" 123 1+" ; IMMEDIATE
 : GE3 S" : GE4 345 ;" ;
 : GE5 EVALUATE ; IMMEDIATE

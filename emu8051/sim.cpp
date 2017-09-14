@@ -1,4 +1,3 @@
-#include <stdexcept>
 #include <stddef.h>
 #include <assert.h>
 
@@ -28,39 +27,30 @@ extern "C" {
 
 typedef struct {
   PyObject_HEAD
-  /* Type-specific fields go here. */
   struct em8051 emu;
   int exception;
   PyObject *sfrwrite, *sfrread;
 } emu8051;
 
-static void
-dealloc(emu8051* self)
+static int callback(int r) // Not all registers trigger callbacks
 {
-  Py_TYPE(self)->tp_free((PyObject*)self);
+  return (r & ~1) != 0x82;
 }
-
-static int uart_data = 0xc1;
 
 static int
 emu_sfrread(struct em8051 *aCPU, int aRegister)
 {
   emu8051 *emu = (emu8051*)((char*)aCPU - offsetof(emu8051, emu));
-  if (aRegister == 0x86) {
-    return 4;  // Pretend UART receive byte always ready
-  }
   unsigned val = aCPU->mSFR[aRegister - 0x80];
-  if (emu->sfrread) {
+  if (emu->sfrread && callback(aRegister)) {
     PyObject* o = PyObject_CallFunction(emu->sfrread,
                                         (char*)"ii",
                                         aRegister,
                                         val);
     if (o == NULL)
       emu->exception = 1;
-    else {
-      assert(PyInt_Check(o));
+    else
       val = PyInt_AsLong(o);
-    }
   }
   return val;
 }
@@ -69,43 +59,37 @@ static void
 emu_sfrwrite(struct em8051 *aCPU, int aRegister)
 {
   emu8051 *emu = (emu8051*)((char*)aCPU - offsetof(emu8051, emu));
-  if (aRegister == uart_data) {
-    aCPU->mSFR[0xe8 - 0x80] = 2;
-  }
-  if (emu->sfrwrite) {
+  if (emu->sfrwrite && callback(aRegister))
     if (PyObject_CallFunction(emu->sfrwrite,
                               (char*)"ii",
                               aRegister,
-                              aCPU->mSFR[aRegister - 0x80]) == NULL) {
+                              aCPU->mSFR[aRegister - 0x80]) == NULL)
       emu->exception = 1;
-    }
-  }
 }
 
 static int
 init(emu8051 *self, PyObject *args, PyObject *kwds)
 {
   struct em8051 &emu = self->emu;
+  PyObject *wr, *rd;
+  if (!PyArg_ParseTuple(args, "OO", &wr, &rd))
+    return 1;
 
-  self->sfrwrite = NULL;
-  self->sfrread = NULL;
+  self->sfrwrite = wr;
+  self->sfrread = rd;
+  Py_INCREF(wr);
+  Py_INCREF(rd);
 
   memset(&emu, 0, sizeof(emu));
-
   emu.mCodeMem     = (unsigned char*)malloc(65536);
   emu.mCodeMemSize = 65536;
   emu.mExtData     = emu.mCodeMem;
   emu.mExtDataSize = 65536;
-  emu.mSFR   = (unsigned char*)malloc(128);
-
-  {
-    // For TI CC1110:
-    emu.mLowerData   = emu.mExtData + 0xff00;
-    emu.mUpperData   = emu.mExtData + 0xff80;
-  }
-
+  emu.mSFR         = (unsigned char*)malloc(128);
+  emu.mLowerData   = emu.mExtData + 0xff00;
+  emu.mUpperData   = emu.mExtData + 0xff80;
   emu.sfrread      = &emu_sfrread;
-  emu.sfrwrite      = &emu_sfrwrite;
+  emu.sfrwrite     = &emu_sfrwrite;
 
   reset(&emu, 1);
   memset(emu.mCodeMem, 0xff, emu.mCodeMemSize);
@@ -134,13 +118,11 @@ init(emu8051 *self, PyObject *args, PyObject *kwds)
 0x00, 0x00, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
 0x00, 0x00, 0x00, 0x00};
   memcpy(emu.mExtData + 0xdf00, df00_block, 0x100);
-
   int rc = load_obj(&emu, (char*)"../cc0.hex");
   if (rc < 0) {
     fprintf(stderr, "load obj error %d\n", rc);
     exit(1);
   }
-
   return 0;
 }
 
@@ -153,35 +135,14 @@ static PyObject *reset(PyObject *self, PyObject *args)
 static PyObject *run(PyObject *self, PyObject *args)
 {
   emu8051 *emu = (emu8051*)self;
-
-  emu->exception = 0;
-  while (!emu->exception) {
-    if (PyErr_CheckSignals())
-      return NULL;
+  for (emu->exception = 0; !emu->exception; )
     tick(&emu->emu);
-  }
   return NULL;
-}
-
-PyObject *setrw(PyObject *self, PyObject *args)
-{
-  emu8051 *emu = (emu8051*)self;
-  PyObject *wr, *rd;
-  if (!PyArg_ParseTuple(args, "OO", &wr, &rd))
-    return NULL;
-
-  emu->sfrwrite = wr;
-  emu->sfrread = rd;
-  Py_INCREF(wr);
-  Py_INCREF(rd);
-
-  Py_RETURN_NONE;
 }
 
 static PyMethodDef methods[] = {
   {"reset", reset, METH_NOARGS},
   {"run", run, METH_VARARGS},
-  {"setrw", setrw, METH_VARARGS},
   {NULL}  /* Sentinel */
 };
 
@@ -190,7 +151,7 @@ static PyTypeObject emu8051Type = {
   "emu8051",                /*tp_name*/
   sizeof(emu8051),          /*tp_basicsize*/
   0,                        /*tp_itemsize*/
-  (destructor)dealloc,      /*tp_dealloc*/
+  0,                        /*tp_dealloc*/
   0,                        /*tp_print*/
   0,                        /*tp_getattr*/
   0,                        /*tp_setattr*/

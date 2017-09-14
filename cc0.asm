@@ -2492,8 +2492,12 @@ notNL:  cjne a,#0x0d,ACC5
         lcall NIP
         lcall SWOP
         ljmp MINUS
-ACC5:   lcall DUP
+ACC5:
+        mov a,_TTH
+        jnz ACC6
+        lcall DUP
         lcall EMIT
+ACC6:
         mov a,dpl
         cjne a,#8,ACC3
         lcall DROP
@@ -2643,6 +2647,14 @@ PARSE:
         .drw isnotdelim
 
         ljmp _parse
+
+        .drw link
+        .set link,*+1
+        .db 0,2,".("
+        lcall LIT
+        .drw 0x29
+        lcall PARSE
+        ljmp TYPE
 
 ;Z (S")    -- c-addr u       run-time code for S"
 ;   R@ I@                     get Data address
@@ -2875,7 +2887,7 @@ TODIGIT: lcall DUP
         .drw link
         .set link,*+1
         .db 0,1,"#"
-NUM:    acall BASE
+NUM:    lcall BASE
         lcall FETCH
         lcall UDSLASHMOD
         lcall ROT
@@ -3489,6 +3501,12 @@ QNUM2:  lcall LIT
         .drw -1
 QNUM3:  ret
 
+; Write out the error string
+ERROR:
+        lcall XISQUOTE
+        .db 7,"error: "
+        ljmp TYPE
+
 ;Z INTERPRET    i*x c-addr u -- j*x
 ;Z                         interpret given buffer
 ; This is a common factor of EVALUATE and QUIT.
@@ -3542,7 +3560,9 @@ INTER4: acall QNUMBER
         jz INTER5
         lcall LITERAL
         sjmp INTER6
-INTER5: lcall COUNT
+INTER5: 
+        lcall ERROR
+        lcall COUNT
         lcall TYPE
         lcall LIT
         .drw 0x3F
@@ -3607,7 +3627,10 @@ QUIT1:  lcall TIB
         lcall XISQUOTE
         .db 2,"ok"
         lcall ITYPE
-QUIT2:  lcall CR
+QUIT2:
+        mov a,_TTH
+        jnz QUIT1
+        lcall CR
         sjmp QUIT1
 
 ;C ABORT    i*x --   R: j*x --   clear stk & QUIT
@@ -4198,14 +4221,6 @@ ENVIRONMENTQ: lcall TWODROP
 ; not to delete the equates at the end of file.
 ; ===============================================
 
-        .drw link
-        .set link,*+1
-        .db 0,2,"><"
-SWAB:   mov a,dph
-        mov dph,dpl
-        mov dpl,a
-        ret
-
 HEX2:   lcall DUP
         mov a,dpl
         swap a
@@ -4229,7 +4244,7 @@ DOTX2:  lcall HEX2
         .set link,*+1
         .db 0,2,".X"
 DOTX:   lcall DUP
-        lcall SWAB
+        lcall swapbytes
         lcall HEX2
         lcall HEX2
         ljmp SPACE
