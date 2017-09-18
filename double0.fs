@@ -1,64 +1,64 @@
 \ #######   DOUBLE low-level primitives   ####################
 
-: 2ROT
-    >R >R 2SWAP R> R> 2SWAP
+: 2rot
+    >r >r 2swap r> r> 2swap
 ;
 
-: 2LITERAL
-    SWAP POSTPONE LITERAL POSTPONE LITERAL
-; IMMEDIATE
+: 2literal
+    swap postpone literal postpone literal
+; immediate
 
-: DABS
-    DUP 0< IF DNEGATE THEN
+: dabs
+    dup 0< if dnegate then
 ;
 
-: D>S   DROP ;
+: d>s   drop ;
 
-: D=                        \ A B C D -- F ) 
-    >R                      \ A B C 
-    ROT =                   \ B A=C 
-    SWAP R> =               \ A=C B=D 
-    AND
+: d=                        \ a b c d -- f ) 
+    >r                      \ a b c 
+    rot =                   \ b a=c 
+    swap r> =               \ a=c b=d 
+    and
 ; 
 
-: D<            \ ( AL AH BL BH -- FLAG ) 
-    ROT         \ AL BL BH AH 
-    2DUP = 
-    IF 
-        2DROP U< 
-    ELSE 
-        > NIP NIP
-    THEN 
+: d<            \ ( al ah bl bh -- flag ) 
+    rot         \ al bl bh ah 
+    2dup = 
+    if 
+        2drop u< 
+    else 
+        > nip nip
+    then 
 ; 
 
-: DU<           \ ( AL AH BL BH -- FLAG ) 
-    ROT         \ AL BL BH AH 
-    2DUP = 
-    IF 
-        2DROP U< 
-    ELSE 
-        U> NIP NIP
-    THEN 
+: du<           \ ( al ah bl bh -- flag ) 
+    rot         \ al bl bh ah 
+    2dup = 
+    if 
+        2drop u< 
+    else 
+        u> nip nip
+    then 
 ; 
 
-: D-
-    DNEGATE D+
+: d-
+    dnegate d+
 ;
 
-: D0<
-    NIP 0<
+: d0<
+    nip 0<
 ;
 
-: D0=
-    OR 0=
+: d0=
+    or 0=
 ;
 
-: D2*
-    2DUP D+
+: d2*
+    2dup d+
 ; 
 
-: D2/
-    >R 1 RSHIFT R@
-    [ 8 CELLS 1- ] LITERAL LSHIFT
-    OR R> 2/
+: d2/
+    >r 1 rshift r@
+    [ 8 cells 1- ] literal lshift
+    or r> 2/
 ;

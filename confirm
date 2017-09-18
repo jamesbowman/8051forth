@@ -7,7 +7,7 @@ set -e
 # Confirms that the output matches a "golden" version.
 #
 
-cat core.fs runtests.fs core.fr |
+cat core.fs runtests.fs |
 emu8051/emu $1 $2 > actual
 diff actual golden
 rm actual

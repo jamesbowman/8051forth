@@ -118,7 +118,7 @@ init(emu8051 *self, PyObject *args, PyObject *kwds)
 0x00, 0x00, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
 0x00, 0x00, 0x00, 0x00};
   memcpy(emu.mExtData + 0xdf00, df00_block, 0x100);
-  int rc = load_obj(&emu, (char*)"../cc0.hex");
+  int rc = load_obj(&emu, (char*)"cc0.hex");
   if (rc < 0) {
     fprintf(stderr, "load obj error %d\n", rc);
     exit(1);

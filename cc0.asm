@@ -91,7 +91,8 @@
         .equ    _HANDLER,0x10   ; last exception handler
         .equ    _BASE   ,0x12   ; BASE
         .equ    _MS     ,0x14   ; millisecond timer (32-bit)
-        .equ    _TTH    ,0x18   ; TTH - tethered
+        .equ    _STATE  ,0x18   ; STATE
+        .equ    _TTH    ,0x1a   ; TTH - tethered
 
         .equ    WORDBUF ,0x20   ; scratch for FIND
         .equ    RSP0    ,0x40   ; start of R stack
@@ -2100,8 +2101,8 @@ BASE:   lcall docon
         .drw link
         .set link,*+1
         .db  0,5,"STATE"
-STATE:  lcall douser
-        .drw 6
+STATE:  lcall docon
+        .drw 0xff00 + _STATE
 
 ;Z DP      -- a-addr         holds dictionary ptr
 ;  8 USER DP
@@ -3356,6 +3357,15 @@ LITERAL: lcall STATE
         lcall ICOMMA
 LITER1: ret
 
+;C 2LITERAL d --           append numeric literal
+        .drw link
+        .set link,*+1
+        .db IMMED,8,"2LITERAL"
+TWOLITERAL:
+        lcall SWOP
+        lcall LITERAL
+        ljmp LITERAL
+
 ;Z DIGIT?   c -- n -1   if c is a valid digit
 ;Z            -- x  0   otherwise
 ;   [ HEX ] DUP 39 > 100 AND +     silly looking
@@ -3462,44 +3472,112 @@ TONUM2: lcall TOR
         sjmp TONUM1
 TONUM3: ret
 
-;Z ?NUMBER  c-addr -- n -1      string->number
-;Z                 -- c-addr 0  if convert error
-;   DUP  0 0 ROT COUNT      -- ca ud adr n
-;   ?SIGN >R  >NUMBER       -- ca ud adr' n'
-;   IF   R> 2DROP 2DROP 0   -- ca 0   (error)
-;   ELSE 2DROP NIP R>
-;       IF NEGATE THEN  -1  -- n -1   (ok)
-;   THEN ;
-        .drw link
-        .set link,*+1
-        .db 0,7,"?NUMBER"
-QNUMBER:
-        lcall DUP
-        lcall LIT
-        .drw 0x0
-        lcall DUP
-        lcall ROT
-        lcall COUNT
-        lcall QSIGN
+;  : consume1 ( caddr u ch -- caddr' u' f )
+;      >r over c@ r> =
+;      over 0<> and
+;      dup >r negate /string r>
+;  ;
+
+CONSUME1:
         lcall TOR
-        lcall TONUMBER
-        lcall zerosense
-        jz QNUM1
+        lcall OVER
+        lcall CFETCH
         lcall RFROM
-        lcall TWODROP
-        lcall TWODROP
-        lcall LIT
-        .drw 0x0
-        sjmp QNUM3
-QNUM1:  lcall TWODROP
-        lcall NIP
-        lcall RFROM
-        lcall zerosense
-        jz QNUM2
+        lcall EQUAL
+        lcall OVER
+        lcall ZERONOTEQUAL
+        lcall AND
+        lcall DUP
+        lcall TOR
         lcall NEGATE
-QNUM2:  lcall LIT
-        .drw -1
-QNUM3:  ret
+        lcall SLASHSTRING
+        lcall RFROM
+        ret
+;  
+;  : doublenumber       ( caddr u -- n 0 | d. 1 )
+;      0. 2swap
+;      [char] - consume1 >r
+;      >number
+;      [char] . consume1 >r            \ 0 is single, -1 double
+;      nip ?error                      \ any chars remain: abort
+;      r> ?dneg                        \ is negative
+;      r> ?dup and                     \ if single, remove high cell
+;  ;
+
+BASEDOUBLENUMBER:
+        lcall LIT
+        .drw '$'
+        lcall CONSUME1
+        lcall zerosense
+        jz BASEDOUBLENUMBER1
+        mov a,#16
+BASED:
+        push _BASE
+        mov _BASE,a
+        acall DOUBLENUMBER
+        pop _BASE
+        ret
+
+BASEDOUBLENUMBER1:
+        lcall LIT
+        .drw '%'
+        lcall CONSUME1
+        lcall zerosense
+        jz BASEDOUBLENUMBER2
+        mov a,#2
+        sjmp BASED
+
+BASEDOUBLENUMBER2:
+        lcall LIT
+        .drw '#'
+        lcall CONSUME1
+        lcall zerosense
+        jz BASEDOUBLENUMBER3
+        mov a,#10
+        sjmp BASED
+
+BASEDOUBLENUMBER3:
+        lcall LIT
+        .drw 0x27
+        lcall CONSUME1
+        lcall zerosense
+        jz DOUBLENUMBER
+        lcall DROP
+        lcall CFETCH
+        ljmp FALSE
+        
+DOUBLENUMBER:
+        lcall FALSE
+        lcall FALSE
+        lcall TWOSWAP
+        lcall LIT
+        .drw '-'
+        lcall CONSUME1
+        lcall TOR                       ; sign
+        lcall TONUMBER
+        lcall LIT
+        .drw '.'
+        lcall CONSUME1
+        mov b,dpl                       ; double
+        lcall DROP
+        lcall NIP
+        lcall QERROR
+        lcall RFROM                     ;
+        lcall QDNEGATE
+        lcall DUP
+        mov dpl,b
+        mov dph,b
+        lcall QDUP
+        lcall AND
+        ret
+
+QERROR:
+        lcall zerosense
+        jz QERROR1
+        lcall ERROR
+        ljmp ABORT
+QERROR1:
+        ret
 
 ; Write out the error string
 ERROR:
@@ -3541,36 +3619,30 @@ INTER1: lcall BL
         lcall zerosense
         jz INTER9
         lcall FIND
-        lcall QDUP
-        lcall zerosense
+        mov a,dpl
+        lcall DROP
         jz INTER4
-        lcall ONEPLUS
-        lcall STATE
-        lcall FETCH
-        lcall ZEROEQUAL
-        lcall OR
-        lcall zerosense
-        jz INTER2
+        dec a
+        anl a,_STATE
+        jnz INTER2
         lcall EXECUTE
-        sjmp INTER3
+        sjmp INTER1
 INTER2: lcall COMMAXT
-INTER3: sjmp INTER8
-INTER4: acall QNUMBER
-        lcall zerosense
-        jz INTER5
-        lcall LITERAL
-        sjmp INTER6
-INTER5: 
-        lcall ERROR
+        sjmp INTER1
+
+INTER4:
         lcall COUNT
-        lcall TYPE
-        lcall LIT
-        .drw 0x3F
-        lcall EMIT
-        lcall CR
-        lcall ABORT
-INTER6:
-INTER8: sjmp INTER1
+        lcall BASEDOUBLENUMBER
+        mov a,dpl
+        lcall DROP
+        jz INTER5
+
+        lcall TWOLITERAL
+        sjmp INTER1
+INTER5:
+        lcall LITERAL
+        sjmp INTER1
+
 INTER9: ljmp DROP
 
 ;C EVALUATE  i*x c-addr u -- j*x  interprt string
@@ -3862,6 +3934,12 @@ COLON:  acall CREATE
         acall RIGHTBRACKET
         ljmp STORCOLON
 
+        .drw link
+        .set link,*+1
+        .db 0,7,":NONAME"
+NONAME: lcall IHERE
+        ljmp RIGHTBRACKET
+
 ;Z ,EXIT    --      append hi-level EXIT action
 ;   022 IC, ;               8051 VERSION
 ; This is made a distinct word, because on an STC
@@ -4018,7 +4096,7 @@ AGAIN:  lcall LIT
         .drw link
         .set link,*+1
         .db IMMED,5,"WHILE"
-WHILE:  acall IF
+WHILE:  lcall IF
         ljmp SWOP
 
 ;C REPEAT   adrs1 adrs2 --     resolve WHILE loop
@@ -4026,7 +4104,7 @@ WHILE:  acall IF
         .drw link
         .set link,*+1
         .db IMMED,6,"REPEAT"
-REPEAT: acall AGAIN
+REPEAT: lcall AGAIN
         sjmp THEN
 
 ;Z >L   x --   L: -- x        move to leave stack
@@ -4451,6 +4529,8 @@ INITBLK:
         .drw    10              ; BASE
         .drw    0,0             ; MS
         .drw    0               ; TTH
+        .drw    0               ; STATE
+
         .equ    INITBLKSIZE,*-INITBLK
 INITB:                          ; ( -- a u ) \ return init block
         lcall lit

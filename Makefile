@@ -8,6 +8,7 @@ $(ASM):
 
 $(EMU):
 	make -C emu8051
+	cd emu8051 ; python setup.py install --user
 
 %.hex: %.asm $(AS31)
 	$(ASM) -l $<

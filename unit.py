@@ -1,6 +1,5 @@
 import sys
 
-sys.path.append("build/lib.linux-x86_64-2.7")
 import emu8051
 from forthshell import ForthShell, main
 
@@ -12,7 +11,7 @@ class DUT(ForthShell):
         self.start()
         self.e = emu8051.emu8051(self.writer, self.reader)
         self.uart_out = []
-        self.uart_in = "1 TTH !" + '\r\n'
+        self.uart_in = "TRUE TTH !" + '\r\n'
         self.frob()
 
     def boot(self, *a):
