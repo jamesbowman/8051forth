@@ -10,7 +10,7 @@ include tester.fr
 
 include core.fr
 include coreplustest.fth
-\ include errorreport.fth
+include errorreport.fth
 \ marker XX
 \ include coreexttest.fth
 \ XX

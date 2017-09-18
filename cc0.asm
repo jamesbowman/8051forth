@@ -92,10 +92,14 @@
         .equ    _BASE   ,0x12   ; BASE
         .equ    _MS     ,0x14   ; millisecond timer (32-bit)
         .equ    _STATE  ,0x18   ; STATE
-        .equ    _TTH    ,0x1a   ; TTH - tethered
+        .equ    _TTH    ,0x1a   ; TTH (tethered)
+        .equ    _TOIN   ,0x1c   ; >IN
+        .equ    _SOURCE ,0x20   ; TICKSOURCE
+        .equ    _HP     ,0x24   ; HP
+        .equ    _LP     ,0x26   ; LP
 
-        .equ    WORDBUF ,0x20   ; scratch for FIND
-        .equ    RSP0    ,0x40   ; start of R stack
+        .equ    WORDBUF ,0x30   ; scratch for FIND
+        .equ    RSP0    ,0x50   ; start of R stack
         .equ    S0      ,0xff   ; start of D stack
 
 ; FORTH MEMORY MAP EQUATES
@@ -2085,8 +2089,8 @@ U0:     lcall douser
         .drw link
         .set link,*+1
         .db  0,3,">IN"
-TOIN:   lcall douser
-        .drw 2
+TOIN:   lcall docon
+        .drw 0xff00 + _TOIN
 
 ;C BASE    -- a-addr       holds conversion radix
 ;  4 USER BASE
@@ -2117,8 +2121,8 @@ DP:     lcall docon
         .drw link
         .set link,*+1
         .db  0,7,0x27,"SOURCE"  ; 27h = '
-TICKSOURCE: lcall douser
-        .drw 10
+TICKSOURCE: lcall docon
+        .drw 0xff00 + _SOURCE
 
 ;Z LATEST    -- a-addr         last word in dict.
 ;   14 USER LATEST
@@ -2133,16 +2137,16 @@ LATEST: lcall docon
         .drw link
         .set link,*+1
         .db  0,2,"HP"
-HP:     lcall douser
-        .drw 16
+HP:     lcall docon
+        .drw 0xff00 + _HP
 
 ;Z LP       -- a-addr         Leave-stack pointer
 ;   18 USER LP
         .drw link
         .set link,*+1
         .db  0,2,"LP"
-LP:     lcall douser
-        .drw 18
+LP:     lcall docon
+        .drw 0xff00 + _LP
 
 ;Z IDP    -- a-addr        ROM dictionary pointer
 ;   20 USER IDP
@@ -3396,38 +3400,6 @@ DIGITQ:
         lcall FETCH
         ljmp ULESS
 
-;Z ?SIGN   adr n -- adr' n' f   get optional sign
-;Z  advance adr/n if sign; return NZ if negative
-;   OVER C@                 -- adr n c
-;   2C - DUP ABS 1 = AND    -- +=-1, -=+1, else 0
-;   DUP IF 1+               -- +=0, -=+2
-;       >R 1 /STRING R>     -- adr' n' f
-;   THEN ;
-        .drw link
-        .set link,*+1
-        .db 0,5,"?SIGN"
-QSIGN:  lcall OVER
-        lcall CFETCH
-        lcall LIT
-        .drw 0x2C
-        lcall MINUS
-        lcall DUP
-        lcall ABS
-        lcall LIT
-        .drw 0x1
-        lcall EQUAL
-        lcall AND
-        lcall DUP
-        lcall zerosense
-        jz QSIGN1
-        lcall ONEPLUS
-        lcall TOR
-        lcall LIT
-        .drw 0x1
-        lcall SLASHSTRING
-        lcall RFROM
-QSIGN1: ret
-
 ;C >NUMBER  ud adr u -- ud' adr' u'
 ;C                       convert string to number
 ;   BEGIN
@@ -4524,8 +4496,12 @@ INITBLK:
         .drw    0               ; HANDLER
         .drw    10              ; BASE
         .drw    0,0             ; MS
-        .drw    0               ; TTH
         .drw    0               ; STATE
+        .drw    0               ; TTH
+        .drw    0               ; >IN
+        .drw    0,0             ; 'SOURCE
+        .drw    0               ; HP
+        .drw    0               ; LP
 
         .equ    INITBLKSIZE,*-INITBLK
 INITB:                          ; ( -- a u ) \ return init block

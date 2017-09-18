@@ -1,8 +1,5 @@
 \ #######   DOUBLE   ##########################################
 
-: 2LITERAL
-    SWAP POSTPONE LITERAL POSTPONE LITERAL ; IMMEDIATE
-
 : 2VARIABLE
     CREATE 2 CELLS ALLOT ;
 
