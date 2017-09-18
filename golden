@@ -21,6 +21,11 @@ YOU SHOULD SEE THE NUMBER RANGES OF SIGNED AND UNSIGNED NUMBERS:
 UNSIGNED: 0 FFFF 
 *
 End of Core word set tests
+******Start 
+***
+You should see 2345: 2345
+*
+End of additional Core tests
 
 
 Forth tests completed 

@@ -7,9 +7,9 @@
 CR .( Running ANS Forth and Forth 2012 test programs, version 0.11) CR
 
 include tester.fr
-include core.fr
 
-\ include coreplustest.fth
+include core.fr
+include coreplustest.fth
 \ include errorreport.fth
 \ marker XX
 \ include coreexttest.fth

@@ -3635,6 +3635,8 @@ INTER4:
         lcall BASEDOUBLENUMBER
         mov a,dpl
         lcall DROP
+        mov r1,_state
+        cjne r1,#-1,INTER1
         jz INTER5
 
         lcall TWOLITERAL
