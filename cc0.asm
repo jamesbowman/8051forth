@@ -3342,20 +3342,14 @@ FIND3:
 
 ;C LITERAL  x --           append numeric literal
 ;   STATE @ IF ['] LIT ,XT I, THEN ; IMMEDIATE
-; This tests STATE so that it can also be used
-; interpretively.  (ANSI doesn't require this.)
         .drw link
         .set link,*+1
         .db IMMED,7,"LITERAL"
-LITERAL: lcall STATE
-        lcall FETCH
-        lcall zerosense
-        jz LITER1
+LITERAL:
         lcall LIT
         .drw LIT
         lcall COMMAXT
-        lcall ICOMMA
-LITER1: ret
+        ljmp ICOMMA
 
 ;C 2LITERAL d --           append numeric literal
         .drw link
