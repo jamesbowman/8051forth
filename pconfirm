@@ -1,0 +1,8 @@
+set -e
+
+python unit.py -p . -p anstests core.fs \
+double0.fs double.fs \
+runtests.fs -e '#bye' > actual
+diff actual golden
+rm actual
+

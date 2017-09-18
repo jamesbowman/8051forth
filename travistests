@@ -1,4 +1,4 @@
 set -e
 make
 # ./confirm generic camel51.hex
-./confirm cc1110  cc0.hex
+./pconfirm
