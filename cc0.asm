@@ -1026,11 +1026,9 @@ cyprop: subb a,acc      ; -1 if A was 0, else 0
         .drw link
         .set link,*+1
         .db  0,2,"0>"
-ZEROGREATER: mov a,dpl
-        add a,#0xff
-        mov a,dph
-        addc a,#0xff
-        sjmp cyprop
+ZEROGREATER:
+        lcall FALSE
+        ljmp GREATER
 
 ;C =        x1 x2 -- flag              test x1=x2
         .drw link
@@ -1200,6 +1198,18 @@ TWORFROM: pop dr3         ; save ret addr in r3:r2
         push dr2        ; restore return address
         push dr3
         ret
+
+; ;C 2R@      -- x   R: x -- x
+;         .drw link
+;         .set link,*+1
+;         .db  0,3,"2R@"
+; TWORFETCH:
+;         lcall DUP
+;         mov a,sp
+;         add a,#-2
+;         mov dpl,a
+;         mov dph,0xff
+;         ljmp TWOFETCH
 
 ;Z D+       d d -- d         add double
         .drw link
