@@ -2,7 +2,7 @@ set -e
 
 make
 make -C emu8051
-if true
+if false
 then
   # emu8051/emu cc1110 cc0.hex ; exit
   ./confirm cc1110 cc0.hex # ; exit
@@ -15,6 +15,12 @@ then
   echo 'run2:'
   # emu8051/emu cc1110 cc0f.hex ; exit
 fi
+
+python unit.py -p . -p anstests core.fs \
+dis.fs \
+runtests.fs \
+# -e '#bye'
+exit
 
 SF=~/swapforth
 PORT=`$SF/j1a/icestorm/findserial`

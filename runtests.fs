@@ -9,13 +9,11 @@ CR .( Running ANS Forth and Forth 2012 test programs, version 0.11) CR
 include tester.fr
 
 include core.fr
+marker XX
 include coreplustest.fth
 include errorreport.fth
-\ marker XX
-\ include coreexttest.fth
-\ XX
-\ marker XX
-\ include doubletest.fth
+include coreexttest.fth
+include doubletest.fth
 \ XX
 \ \ include exceptiontest.fth
 \ marker XX

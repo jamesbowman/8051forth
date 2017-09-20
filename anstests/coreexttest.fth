@@ -307,7 +307,6 @@ T{ AG0 -> 707 }T
 
 \ -----------------------------------------------------------------------------
 TESTING MARKER   (contributed by James Bowman)
-
 T{ : MA? BL WORD FIND NIP 0<> ; -> }T
 T{ MARKER MA0 -> }T
 T{ : MA1 111 ; -> }T
@@ -757,58 +756,58 @@ TESTING REFILL SOURCE-ID
 T{ : RF1  S" REFILL" EVALUATE ; RF1 -> FALSE }T
 T{ : SID1  S" SOURCE-ID" EVALUATE ; SID1 -> -1 }T
 
-\ ------------------------------------------------------------------------------
-TESTING S\"  (Forth 2012 compilation mode)
-\ Extended the Forth 200X RfD tests
-\ Note this tests the Core Ext definition of S\" which has unedfined
-\ interpretation semantics. S\" in interpretation mode is tested in the tests on
-\ the File-Access word set
-
-T{ : SSQ1 S\" abc" s" abc" COMPARE ; -> }T  \ No escapes
-T{ SSQ1 -> 0 }T
-T{ : SSQ2 S\" " ; SSQ2 SWAP DROP -> 0 }T    \ Empty string
-
-T{ : SSQ3 S\" \a\b\e\f\l\m\q\r\t\v\x0F0\x1Fa\xaBx\z\"\\" ; -> }T
-T{ SSQ3 SWAP DROP          ->  20 }T    \ String length
-T{ SSQ3 DROP            C@ ->   7 }T    \ \a   BEL  Bell
-T{ SSQ3 DROP  1 CHARS + C@ ->   8 }T    \ \b   BS   Backspace
-T{ SSQ3 DROP  2 CHARS + C@ ->  27 }T    \ \e   ESC  Escape
-T{ SSQ3 DROP  3 CHARS + C@ ->  12 }T    \ \f   FF   Form feed
-T{ SSQ3 DROP  4 CHARS + C@ ->  10 }T    \ \l   LF   Line feed
-T{ SSQ3 DROP  5 CHARS + C@ ->  13 }T    \ \m        CR of CR/LF pair
-T{ SSQ3 DROP  6 CHARS + C@ ->  10 }T    \           LF of CR/LF pair
-T{ SSQ3 DROP  7 CHARS + C@ ->  34 }T    \ \q   "    Double Quote
-T{ SSQ3 DROP  8 CHARS + C@ ->  13 }T    \ \r   CR   Carriage Return
-T{ SSQ3 DROP  9 CHARS + C@ ->   9 }T    \ \t   TAB  Horizontal Tab
-T{ SSQ3 DROP 10 CHARS + C@ ->  11 }T    \ \v   VT   Vertical Tab
-T{ SSQ3 DROP 11 CHARS + C@ ->  15 }T    \ \x0F      Given Char
-T{ SSQ3 DROP 12 CHARS + C@ ->  48 }T    \ 0    0    Digit follow on
-T{ SSQ3 DROP 13 CHARS + C@ ->  31 }T    \ \x1F      Given Char
-T{ SSQ3 DROP 14 CHARS + C@ ->  97 }T    \ a    a    Hex follow on
-T{ SSQ3 DROP 15 CHARS + C@ -> 171 }T    \ \xaB      Insensitive Given Char
-T{ SSQ3 DROP 16 CHARS + C@ -> 120 }T    \ x    x    Non hex follow on
-T{ SSQ3 DROP 17 CHARS + C@ ->   0 }T    \ \z   NUL  No Character
-T{ SSQ3 DROP 18 CHARS + C@ ->  34 }T    \ \"   "    Double Quote
-T{ SSQ3 DROP 19 CHARS + C@ ->  92 }T    \ \\   \    Back Slash
-
-\ The above does not test \n as this is a system dependent value.
-\ Check it displays a new line
-CR .( The next test should display:)
-CR .( One line...)
-CR .( another line)
-T{ : SSQ4 S\" \nOne line...\nanotherLine\n" type ; SSQ4 -> }T
-
-\ Test bare escapable characters appear as themselves
-t{ : SSQ5 s\" abeflmnqrtvxz" ; SSQ5 s" abeflmnqrtvxz" COMPARE -> 0 }t
-
-t{ : SSQ6 s\" a\""2DROP 1111 ; SSQ6 -> 1111 }t \ Parsing behaviour
-
-T{ : SSQ7  S\" 111 : SSQ8 s\\\" 222\" EVALUATE ; SSQ8 333" EVALUATE ; -> }T
-T{ SSQ7 -> 111 222 333 }T
-T{ : SSQ9  S\" 11 : SSQ10 s\\\" \\x32\\x32\" EVALUATE ; SSQ10 33" EVALUATE ; -> }T
-T{ SSQ9 -> 11 22 33 }T
-
-\ -----------------------------------------------------------------------------
+\ \ ------------------------------------------------------------------------------
+\ TESTING S\"  (Forth 2012 compilation mode)
+\ \ Extended the Forth 200X RfD tests
+\ \ Note this tests the Core Ext definition of S\" which has unedfined
+\ \ interpretation semantics. S\" in interpretation mode is tested in the tests on
+\ \ the File-Access word set
+\ 
+\ T{ : SSQ1 S\" abc" s" abc" COMPARE ; -> }T  \ No escapes
+\ T{ SSQ1 -> 0 }T
+\ T{ : SSQ2 S\" " ; SSQ2 SWAP DROP -> 0 }T    \ Empty string
+\ 
+\ T{ : SSQ3 S\" \a\b\e\f\l\m\q\r\t\v\x0F0\x1Fa\xaBx\z\"\\" ; -> }T
+\ T{ SSQ3 SWAP DROP          ->  20 }T    \ String length
+\ T{ SSQ3 DROP            C@ ->   7 }T    \ \a   BEL  Bell
+\ T{ SSQ3 DROP  1 CHARS + C@ ->   8 }T    \ \b   BS   Backspace
+\ T{ SSQ3 DROP  2 CHARS + C@ ->  27 }T    \ \e   ESC  Escape
+\ T{ SSQ3 DROP  3 CHARS + C@ ->  12 }T    \ \f   FF   Form feed
+\ T{ SSQ3 DROP  4 CHARS + C@ ->  10 }T    \ \l   LF   Line feed
+\ T{ SSQ3 DROP  5 CHARS + C@ ->  13 }T    \ \m        CR of CR/LF pair
+\ T{ SSQ3 DROP  6 CHARS + C@ ->  10 }T    \           LF of CR/LF pair
+\ T{ SSQ3 DROP  7 CHARS + C@ ->  34 }T    \ \q   "    Double Quote
+\ T{ SSQ3 DROP  8 CHARS + C@ ->  13 }T    \ \r   CR   Carriage Return
+\ T{ SSQ3 DROP  9 CHARS + C@ ->   9 }T    \ \t   TAB  Horizontal Tab
+\ T{ SSQ3 DROP 10 CHARS + C@ ->  11 }T    \ \v   VT   Vertical Tab
+\ T{ SSQ3 DROP 11 CHARS + C@ ->  15 }T    \ \x0F      Given Char
+\ T{ SSQ3 DROP 12 CHARS + C@ ->  48 }T    \ 0    0    Digit follow on
+\ T{ SSQ3 DROP 13 CHARS + C@ ->  31 }T    \ \x1F      Given Char
+\ T{ SSQ3 DROP 14 CHARS + C@ ->  97 }T    \ a    a    Hex follow on
+\ T{ SSQ3 DROP 15 CHARS + C@ -> 171 }T    \ \xaB      Insensitive Given Char
+\ T{ SSQ3 DROP 16 CHARS + C@ -> 120 }T    \ x    x    Non hex follow on
+\ T{ SSQ3 DROP 17 CHARS + C@ ->   0 }T    \ \z   NUL  No Character
+\ T{ SSQ3 DROP 18 CHARS + C@ ->  34 }T    \ \"   "    Double Quote
+\ T{ SSQ3 DROP 19 CHARS + C@ ->  92 }T    \ \\   \    Back Slash
+\ 
+\ \ The above does not test \n as this is a system dependent value.
+\ \ Check it displays a new line
+\ CR .( The next test should display:)
+\ CR .( One line...)
+\ CR .( another line)
+\ T{ : SSQ4 S\" \nOne line...\nanotherLine\n" type ; SSQ4 -> }T
+\ 
+\ \ Test bare escapable characters appear as themselves
+\ t{ : SSQ5 s\" abeflmnqrtvxz" ; SSQ5 s" abeflmnqrtvxz" COMPARE -> 0 }t
+\ 
+\ t{ : SSQ6 s\" a\""2DROP 1111 ; SSQ6 -> 1111 }t \ Parsing behaviour
+\ 
+\ T{ : SSQ7  S\" 111 : SSQ8 s\\\" 222\" EVALUATE ; SSQ8 333" EVALUATE ; -> }T
+\ T{ SSQ7 -> 111 222 333 }T
+\ T{ : SSQ9  S\" 11 : SSQ10 s\\\" \\x32\\x32\" EVALUATE ; SSQ10 33" EVALUATE ; -> }T
+\ T{ SSQ9 -> 11 22 33 }T
+\ 
+\ \ -----------------------------------------------------------------------------
 CORE-EXT-ERRORS SET-ERROR-COUNT
 
 CR .( End of Core Extension word tests) CR

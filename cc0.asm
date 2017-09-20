@@ -97,6 +97,8 @@
         .equ    _SOURCE ,0x20   ; TICKSOURCE
         .equ    _HP     ,0x24   ; HP
         .equ    _LP     ,0x26   ; LP
+        .equ    _THISXT ,0x28   ; THISXT
+        .equ    _SRCID,  0x2a   ; 'SOURCE-ID
 
         .equ    WORDBUF ,0x30   ; scratch for FIND
         .equ    RSP0    ,0x50   ; start of R stack
@@ -774,25 +776,8 @@ PLUS:   mov a,dpl       ; low byte
         .drw link
         .set link,*+1
         .db  0,2,"M+"
-MPLUS:  mov dr2,@r0     ; pop d.high -> r3:r2
-        inc r0
-        mov dr3,@r0
-        inc r0
-        mov a,@r0       ; d.low, low byte
-        add a,dpl
-        mov @r0,a
-        inc r0
-        mov a,@r0       ; d.low, high byte
-        addc a,dph
-        mov @r0,a
-        dec r0
-        clr a
-        addc a,r2       ; d.high, low byte
-        mov dpl,a
-        clr a
-        addc a,r3       ; d.high, high byte
-        mov dph,a
-        ret
+MPLUS:  lcall STOD
+        ljmp DPLUS
 
 ;C -        n1/u1 n2/u2 -- n3/u3   subtract n1-n2
         .drw link
@@ -1206,10 +1191,11 @@ TWORFROM: pop dr3         ; save ret addr in r3:r2
 TWORFETCH:
         lcall DUP
         mov a,sp
-        add a,#-2
+        add a,#-5
         mov dpl,a
-        mov dph,0xff
-        ljmp TWOFETCH
+        mov dph,#0xff
+        lcall TWOFETCH
+        ljmp SWOP
 
 ;Z D+       d d -- d         add double
         .drw link
@@ -1399,7 +1385,16 @@ XDO:    ; limit index --
         mov r7,a
         push dr2    ; restore return addr
         push dr3
+        mov a,#-1
         ajmp poptos ; go pop new TOS
+
+XQDO:
+        lcall TWODUP
+        lcall XOR
+        lcall zerosense
+        jnz XDO     
+                    ; A is zero
+        ljmp TWODROP
 
 ;C I        -- n   R: sys1 sys2 -- sys1 sys2
 ;C                   get the innermost loop index
@@ -2134,6 +2129,13 @@ DP:     lcall docon
 TICKSOURCE: lcall docon
         .drw 0xff00 + _SOURCE
 
+;Z 'SOURCE-ID  -- a-addr
+        .drw link
+        .set link,*+1
+        .db  0,10,0x27,"SOURCE-ID"
+TICKSOURCEID: lcall docon
+        .drw 0xff00 + _SRCID
+
 ;Z LATEST    -- a-addr         last word in dict.
 ;   14 USER LATEST
         .drw link
@@ -2141,6 +2143,9 @@ TICKSOURCE: lcall docon
         .db  0,6,"LATEST"
 LATEST: lcall docon
         .drw 0xff00 + _LATEST
+
+THISXT: lcall docon
+        .drw 0xff00 + _THISXT
 
 ;Z HP       -- a-addr                HOLD pointer
 ;   16 USER HP
@@ -2376,7 +2381,7 @@ STAR:   acall MSTAR
 SLASHMOD: lcall TOR
         acall STOD
         lcall RFROM
-        ajmp FMSLASHMOD
+        ajmp SMSLASHREM
 
 ;C /      n1 n2 -- n3               signed divide
 ;   /MOD nip ;
@@ -2402,7 +2407,7 @@ MOD:    acall SLASHMOD
 SSMOD:  lcall TOR
         acall MSTAR
         lcall RFROM
-        ajmp FMSLASHMOD
+        ajmp SMSLASHREM
 
 ;C */     n1 n2 n3 -- n4                 n1*n2/n3
 ;   */MOD nip ;
@@ -2665,7 +2670,7 @@ PARSE:
 
         .drw link
         .set link,*+1
-        .db 0,2,".("
+        .db IMMED,2,".("
         lcall LIT
         .drw 0x29
         lcall PARSE
@@ -2743,16 +2748,6 @@ SQUOTE: lcall LIT
         lcall DUP
         lcall ALLOT
         ljmp IALLOT
-
-;C ."       --            compile string to print
-;   POSTPONE IS"  POSTPONE ITYPE ; IMMEDIATE
-        .drw link
-        .set link,*+1
-        .db IMMED,2,".",0x22
-DOTQUOTE: acall ISQUOTE
-        lcall LIT
-        .drw ITYPE
-        ljmp COMMAXT
 
 ;Z ICOUNT  c-addr1 -- c-addr2 u  counted->adr/len
 ;   DUP CHAR+ SWAP IC@ ;          from Code space
@@ -2865,9 +2860,9 @@ UDSTAR: lcall DUP
         .db 0,4,"HOLD"
 HOLD:   lcall LIT
         .drw -1
-        acall HP
+        lcall HP
         lcall PLUSSTORE
-        acall HP
+        lcall HP
         lcall FETCH
         ljmp CSTORE
 
@@ -2876,8 +2871,8 @@ HOLD:   lcall LIT
         .drw link
         .set link,*+1
         .db 0,2,"<#"
-LESSNUM: acall PAD
-        acall HP
+LESSNUM: lcall PAD
+        lcall HP
         ljmp STORE
 
 ;Z >digit   n -- c            convert to 0..9A..Z
@@ -3561,6 +3556,15 @@ ERROR:
         .db 7,"error: "
         ljmp TYPE
 
+        .drw link
+        .set link,*+1
+        .db 0,7,"SOURCE!"
+SOURCESTORE:
+        lcall TOIN
+        lcall STORE
+        lcall TICKSOURCE
+        ljmp TWOSTORE
+
 ;Z INTERPRET    i*x c-addr u -- j*x
 ;Z                         interpret given buffer
 ; This is a common factor of EVALUATE and QUIT.
@@ -3582,12 +3586,9 @@ ERROR:
         .drw link
         .set link,*+1
         .db 0,9,"INTERPRET"
-INTERPRET: lcall TICKSOURCE
-        lcall TWOSTORE
-        lcall LIT
-        .drw 0x0
-        lcall TOIN
-        lcall STORE
+INTERPRET:
+        lcall FALSE
+        lcall SOURCESTORE
 INTER1: lcall BL
         lcall XWORD
         lcall DUP
@@ -3623,28 +3624,28 @@ INTER5:
 
 INTER9: ljmp DROP
 
-;C EVALUATE  i*x c-addr u -- j*x  interprt string
-;   'SOURCE 2@ >R >R  >IN @ >R
-;   INTERPRET
-;   R> >IN !  R> R> 'SOURCE 2! ;
-        .drw link
-        .set link,*+1
-        .db 0,8,"EVALUATE"
-EVALUATE: lcall TICKSOURCE
-        lcall TWOFETCH
-        lcall TOR
-        lcall TOR
-        lcall TOIN
-        lcall FETCH
-        lcall TOR
-        acall INTERPRET
-        lcall RFROM
-        lcall TOIN
-        lcall STORE
-        lcall RFROM
-        lcall RFROM
-        lcall TICKSOURCE
-        ljmp TWOSTORE
+; ;C EVALUATE  i*x c-addr u -- j*x  interprt string
+; ;   'SOURCE 2@ >R >R  >IN @ >R
+; ;   INTERPRET
+; ;   R> >IN !  R> R> 'SOURCE 2! ;
+;         .drw link
+;         .set link,*+1
+;         .db 0,8,"EVALUATE"
+; EVALUATE: lcall TICKSOURCE
+;         lcall TWOFETCH
+;         lcall TOR
+;         lcall TOR
+;         lcall TOIN
+;         lcall FETCH
+;         lcall TOR
+;         acall INTERPRET
+;         lcall RFROM
+;         lcall TOIN
+;         lcall STORE
+;         lcall RFROM
+;         lcall RFROM
+;         lcall TICKSOURCE
+;         ljmp TWOSTORE
 
 ;C QUIT     --    R: i*x --    interpret from kbd
 ;   L0 LP !  R0 RP!   0 STATE !
@@ -3656,13 +3657,16 @@ EVALUATE: lcall TICKSOURCE
         .drw link
         .set link,*+1
         .db 0,4,"QUIT"
-QUIT:   lcall L0
+QUIT:
+        lcall L0
         lcall LP
         lcall STORE
         mov sp,#RSP0
-        lcall FALSE
-        lcall STATE
-        lcall STORE
+        clr a
+        mov _SRCID,a
+        mov _SRCID+1,a
+        mov _STATE,a
+        mov _STATE+1,a
 QUIT1:  lcall TIB
         lcall DUP
         lcall TIBSIZE
@@ -3787,9 +3791,11 @@ CREATE: lcall LATEST
         lcall LIT
         .drw 0x0
         lcall ICCOMMA
+
         lcall IHERE
         lcall LATEST
         lcall STORE
+
         lcall BL
         lcall IWORD_W
         lcall CFETCH
@@ -3832,9 +3838,8 @@ DOES:   lcall LIT
         .drw link
         .set link,*+1
         .db IMMED,7,"RECURSE"
-RECURSE: lcall LATEST
+RECURSE: lcall THISXT
         lcall FETCH
-        lcall NFATOCFA
         ljmp COMMAXT
 
 ;C [        --      enter interpretive state
@@ -3910,12 +3915,19 @@ IMMEDIATE: lcall LIT
 COLON:  acall CREATE
         acall HIDE
         acall RIGHTBRACKET
-        ljmp STORCOLON
+        lcall STORCOLON
+        lcall IHERE
+        lcall THISXT
+        lcall STORE
+        ret
 
         .drw link
         .set link,*+1
         .db 0,7,":NONAME"
 NONAME: lcall IHERE
+        lcall DUP
+        lcall THISXT
+        lcall STORE
         ljmp RIGHTBRACKET
 
 ;Z ,EXIT    --      append hi-level EXIT action
@@ -4131,16 +4143,20 @@ DO:     lcall LIT
         .drw link
         .set link,*+1
         .db IMMED,3,"?DO"
-QDO:    lcall LIT
-        .drw TWODUP
-        lcall COMMAXT
+QDO:    
         lcall LIT
-        .drw XOR
-        lcall COMMAXT
-        lcall IF
-        lcall DO
-        lcall SWOP
-        ljmp TOL
+        .drw 0x0
+        lcall TOL
+
+        lcall LIT
+        .drw xqdo
+        lcall COMMABRANCH
+        lcall IHERE
+        lcall DUP
+        lcall TOL
+        lcall COMMADEST
+        lcall IHERE
+        ret
 
 ;Z ENDLOOP   adrs xt --   L: 0 a1 a2 .. aN --
 ;   ,BRANCH  ,DEST  ,UNLOOP       backward loop

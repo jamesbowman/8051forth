@@ -4,14 +4,6 @@
     >r >r 2swap r> r> 2swap
 ;
 
-: 2literal
-    swap postpone literal postpone literal
-; immediate
-
-: dabs
-    dup 0< if dnegate then
-;
-
 : d>s   drop ;
 
 : d=                        \ a b c d -- f ) 
