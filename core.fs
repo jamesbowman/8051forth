@@ -192,4 +192,4 @@ include double0.fs
 include double.fs
 include exception.fs
 
-.( Forth system is ) ihere . .( bytes) cr
+\ .( Forth system is ) ihere . .( bytes) cr

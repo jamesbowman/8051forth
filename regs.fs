@@ -342,7 +342,7 @@ FFE1 constant RFST
 : xtosc  0 OSC_PD b! begin XOSC_STB b@ until 1 CLKSPD b! 1 OSC_PD b! ;
 
 decimal
-: xt 64 0 do i specmask . loop ;
+\ : xt 64 0 do i specmask . loop ;
 \ Address Config = No address check
 \ Base Frequency = 433.999969
 \ CRC Enable = true
@@ -584,14 +584,6 @@ buf 256 0 fill
 : x boot getbaud d. ;
 \ : x boot 49664 1 setbaud .s ;
 
-FREQH b?
-99 FREQH b!
-FREQH b?
-
-BAUD_M b?
-99 BAUD_M b!
-BAUD_M b?
-
 \ : frob p1d0 b+ p1_0 begin dup b- dup b+ again ;
 
 \ WWVB receiver
@@ -637,8 +629,6 @@ BAUD_M b?
         ms@ swap - pulse
     again
 ;
-
-
 
 0 IDP !
 COMMIT

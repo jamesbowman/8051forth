@@ -87,7 +87,6 @@ TESTING a system generated exception
 : T7 S" 333 $$QWEQWEQWERT$$ 334" EVALUATE 335 ;
 : T8 S" 222 T7 223" EVALUATE 224 ;
 : T9 S" 111 112 T8 113" EVALUATE 114 ;
-#bye
 T{ 6 7 ' T9 C6 3 -> 6 7 13 3 }T			\ Test unlinking of sources
 
 \ ------------------------------------------------------------------------------

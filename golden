@@ -85,6 +85,8 @@ You should see lines duplicated:
           -1984383624
 **
 End of Double-Number word tests
+***
+End of Exception word tests
 
 
 Forth tests completed 

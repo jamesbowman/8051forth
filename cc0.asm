@@ -2658,7 +2658,6 @@ isnotdelim:
         .drw link
         .set link,*+1
         .db 0,5,"PARSE"
-
 PARSE:
         mov b,dpl
         lcall DROP
