@@ -95,11 +95,10 @@
         .equ    _TTH    ,0x1a   ; TTH (tethered)
         .equ    _TOIN   ,0x1c   ; >IN
         .equ    _SOURCE ,0x1e   ; TICKSOURCE
-        .equ    _HP     ,0x22   ; HP
-        .equ    _LP     ,0x24   ; LP
-        .equ    _THISXT ,0x26   ; THISXT
-        .equ    _SRCID,  0x28   ; 'SOURCE-ID
-        .equ    _FAULT,  0x2a   ; 'FAULT
+        .equ    _LP     ,0x22   ; LP
+        .equ    _THISXT ,0x24   ; THISXT
+        .equ    _SRCID,  0x26   ; 'SOURCE-ID
+        .equ    _FAULT,  0x28   ; 'FAULT
 
         .equ    WORDBUF ,0x30   ; scratch for FIND
         .equ    RSP0    ,0x50   ; start of R stack
@@ -303,6 +302,7 @@ QUERYKEY:
         .set link,*+1
         .db  0,5,"CATCH"
 CATCH:
+        lcall SOURCETOR
         lcall SPFETCH   ; SP@ >R         ( xt ) \ save data stack pointer
         lcall TOR
         lcall HANDLER   ; HANDLER @ >R   ( xt ) \ and previous handler
@@ -318,6 +318,9 @@ CATCH:
         lcall STORE
         lcall RFROM     ; R> DROP        ( )    \ discard saved stack ptr
         lcall DROP
+        mov a,sp
+        add a,#-8
+        mov sp,a
         ljmp FALSE      ; 0              ( 0 )  \ normal completion
 
         .drw link
@@ -341,6 +344,7 @@ THROW1:
         lcall SPSTORE   ; SP! DROP R>    ( exc# ) \ restore stack
         lcall DROP
         lcall RFROM
+        lcall RTOSOURCE
         ret
 
 ; LOOP FACTORS ==================================
@@ -2155,14 +2159,6 @@ LATEST: lcall docon
 THISXT: lcall docon
         .drw 0xff00 + _THISXT
 
-;Z HP       -- a-addr                HOLD pointer
-;   16 USER HP
-        .drw link
-        .set link,*+1
-        .db  0,2,"HP"
-HP:     lcall docon
-        .drw 0xff00 + _HP
-
 ;Z LP       -- a-addr         Leave-stack pointer
 ;   18 USER LP
         .drw link
@@ -2683,59 +2679,6 @@ PARSE:
         lcall PARSE
         ljmp TYPE
 
-;Z ICOUNT  c-addr1 -- c-addr2 u  counted->adr/len
-;   DUP CHAR+ SWAP IC@ ;          from Code space
-        .drw link
-        .set link,*+1
-        .db  0,6,"ICOUNT"
-ICOUNT: lcall DUP
-        inc dptr
-        lcall SWOP
-        ljmp CFETCH
-
-;Z ITYPE   c-addr +n --       type line to term'l
-;   ?DUP IF                       from Code space
-;     OVER + SWAP DO I IC@ EMIT LOOP
-;   ELSE DROP THEN ;
-        .drw link
-        .set link,*+1
-        .db 0,5,"ITYPE"
-ITYPE:  lcall QDUP
-        lcall zerosense
-        jz ITYP4
-        lcall OVER
-        lcall PLUS
-        lcall SWOP
-        lcall XDO
-ITYP3:  lcall II
-        lcall CFETCH
-        lcall EMIT
-        lcall loopsense
-        jz ITYP3
-        lcall UNLOOP
-        sjmp ITYP5
-ITYP4:  lcall DROP
-ITYP5:  ret
-
-
-;Z IWORD     c -- c-addr       WORD to Code space
-;   WORD
-;   IHERE TUCK OVER C@ CHAR+ D->I ;
-        .drw link
-        .set link,*+1
-        .db 0,5,"IWORD"
-IWORD:  lcall XWORD
-        ; lcall towordbuf
-        ; lcall DROP
-        ; lcall LIT
-        ; .drw 0xff00+WORDBUF
-        lcall IHERE
-        lcall TUCK
-        lcall OVER
-        lcall CFETCH
-        inc dptr
-        ljmp CMOVE
-
 IWORD_W:
         lcall XWORD
         lcall towordbuf
@@ -2748,13 +2691,6 @@ IWORD_W:
         lcall CFETCH
         inc dptr
         ljmp CMOVE
-
-; NUMERIC OUTPUT ================================
-; Numeric conversion is done l.s.digit first, so
-; the output buffer is built backwards in memory.
-
-; Some double-precision arithmetic operators are
-; needed to implement ANSI numeric conversion.
 
 ;Z UD/MOD   ud1 u2 -- u3 ud4     32/16->32 divide
 ;   >R 0 R@ UM/MOD  ROT ROT R> UM/MOD ROT ;
@@ -2786,181 +2722,6 @@ UDSTAR: lcall DUP
         lcall UMSTAR
         lcall ROT
         ljmp PLUS
-
-;C HOLD  char --        add char to output string
-;   -1 HP +!  HP @ C! ;
-        .drw link
-        .set link,*+1
-        .db 0,4,"HOLD"
-HOLD:   lcall LIT
-        .drw -1
-        lcall HP
-        lcall PLUSSTORE
-        lcall HP
-        lcall FETCH
-        ljmp CSTORE
-
-;C <#    --              begin numeric conversion
-;   PAD HP ! ;          (initialize Hold Pointer)
-        .drw link
-        .set link,*+1
-        .db 0,2,"<#"
-LESSNUM: lcall PAD
-        lcall HP
-        ljmp STORE
-
-;Z >digit   n -- c            convert to 0..9A..Z
-;   [ HEX ] DUP 9 > 7 AND + 30 + ;
-        .drw link
-        .set link,*+1
-        .db 0,6,">DIGIT"
-TODIGIT: lcall DUP
-        lcall LIT
-        .drw 9
-        lcall GREATER
-        lcall LIT
-        .drw 7
-        lcall AND
-        lcall PLUS
-        lcall LIT
-        .drw 0x30
-        ljmp PLUS
-
-;C #     ud1 -- ud2     convert 1 digit of output
-;   BASE @ UD/MOD ROT >digit HOLD ;
-        .drw link
-        .set link,*+1
-        .db 0,1,"#"
-NUM:    lcall BASE
-        lcall FETCH
-        lcall UDSLASHMOD
-        lcall ROT
-        lcall TODIGIT
-        sjmp HOLD
-
-;C #S    ud1 -- ud2      convert remaining digits
-;   BEGIN # 2DUP OR 0= UNTIL ;
-        .drw link
-        .set link,*+1
-        .db 0,2,"#S"
-NUMS:
-NUMS1:
-        lcall NUM
-        lcall TWODUP
-        lcall OR
-        lcall ZEROEQUAL
-        lcall zerosense
-        jz NUMS1
-        ret
-
-;C #>    ud1 -- c-addr u    end conv., get string
-;   2DROP HP @ PAD OVER - ;
-        .drw link
-        .set link,*+1
-        .db 0,2,"#>"
-NUMGREATER: lcall TWODROP
-        lcall HP
-        lcall FETCH
-        lcall PAD
-        lcall OVER
-        ljmp MINUS
-
-;C SIGN  n --               add minus sign if n<0
-;   0< IF 2D HOLD THEN ;
-        .drw link
-        .set link,*+1
-        .db 0,4,"SIGN"
-SIGN:   lcall ZEROLESS
-        lcall zerosense
-        jz SIGN1
-        lcall LIT
-        .drw 0x2D
-        lcall HOLD
-SIGN1:  ret
-
-;C D.R  d n --
-;   >R DUP >R DABS <# #S R> SIGN #> R> OVER - SPACES TYPE
-        .drw link
-        .set link,*+1
-        .db 0,3,"D.R"
-DDOTR:  lcall TOR
-        lcall DUP
-        lcall TOR
-        lcall DABS
-        lcall LESSNUM
-        lcall NUMS
-        lcall RFROM
-        lcall SIGN
-        lcall NUMGREATER
-        lcall RFROM
-        lcall OVER
-        lcall MINUS
-        lcall SPACES
-        ljmp  TYPE
-
-;C d.  ( d -- )
-;   0 D.R SPACE
-        .drw link
-        .set link,*+1
-        .db 0,2,"D."
-DDOT:   lcall FALSE
-        acall DDOTR
-        ljmp SPACE
-
-;C .  ( n -- )
-;   S>D D.
-        .drw link
-        .set link,*+1
-        .db 0,1,"."
-        lcall STOD
-        sjmp DDOT
-
-;C u.  ( u -- )
-;   0 D.
-        .drw link
-        .set link,*+1
-        .db 0,2,"U."
-UDOT:   lcall FALSE
-        sjmp DDOT
-
-;C .r  ( n1 n2 -- )
-;   >R S>D R> D.R
-        .drw link
-        .set link,*+1
-        .db 0,2,".R"
-DOTR:   lcall TOR
-        lcall STOD
-        lcall RFROM
-        sjmp DDOTR
-
-;C u.r  ( u n -- )
-;   0 SWAP D.R
-        .drw link
-        .set link,*+1
-        .db 0,3,"U.R"
-UDOTR:  lcall FALSE
-        lcall SWOP
-        sjmp DDOTR
-
-;C DECIMAL  --         set number base to decimal
-;   10 BASE ! ;
-        .drw link
-        .set link,*+1
-        .db 0,7,"DECIMAL"
-DECIMAL: lcall LIT
-        .drw 10
-        lcall BASE
-        ljmp STORE
-
-;X HEX     --              set number base to hex
-;   16 BASE ! ;
-        .drw link
-        .set link,*+1
-        .db 0,3,"HEX"
-HEX:    lcall LIT
-        .drw 16
-        lcall BASE
-        ljmp STORE
 
 ; DICTIONARY MANAGEMENT =========================
 
@@ -3158,12 +2919,12 @@ WORD1:  lcall RFROM
         ljmp CSTORE
 
 ;Z NFA>CFA   nfa -- cfa    name adr -> code field
-;   ICOUNT 7F AND + ;       mask off 'smudge' bit
+;   COUNT 7F AND + ;       mask off 'smudge' bit
 ; Harvard model.
         .drw link
         .set link,*+1
         .db 0,7,"NFA>CFA"
-NFATOCFA: lcall ICOUNT
+NFATOCFA: lcall COUNT
         lcall LIT
         .drw 0x07F
         lcall AND
@@ -3186,14 +2947,6 @@ toupper:
         ret
 toupper1:
         add a,#(0x61 + 26)
-        ret
-
-        .drw link
-        .set link,*+1
-        .db 0,1,"U"
-        mov a,dpl
-        lcall toupper
-        mov dpl,a
         ret
 
 ; towordbuf ( c-addr -- c-addr )
@@ -3398,16 +3151,6 @@ CONSUME1:
         lcall SLASHSTRING
         lcall RFROM
         ret
-;  
-;  : doublenumber       ( caddr u -- n 0 | d. 1 )
-;      0. 2swap
-;      [char] - consume1 >r
-;      >number
-;      [char] . consume1 >r            \ 0 is single, -1 double
-;      nip ?error                      \ any chars remain: abort
-;      r> ?dneg                        \ is negative
-;      r> ?dup and                     \ if single, remove high cell
-;  ;
 
 BASEDOUBLENUMBER:
         lcall LIT
@@ -3485,6 +3228,34 @@ SOURCESTORE:
         lcall STORE
         lcall TICKSOURCE
         ljmp TWOSTORE
+
+        .drw link
+        .set link,*+1
+        .db 0,8,"SOURCE>R"
+SOURCETOR:
+        lcall RFROM
+        lcall TOIN
+        lcall FETCH
+        lcall TOR
+        lcall SOURCE
+        lcall TWOTOR
+        lcall TICKSOURCEID
+        lcall FETCH
+        lcall TOR
+        ljmp EXECUTE
+
+        .drw link
+        .set link,*+1
+        .db 0,8,"R>SOURCE"
+RTOSOURCE:
+        lcall RFROM
+        lcall RFROM
+        lcall TICKSOURCEID
+        lcall STORE
+        lcall TWORFROM
+        lcall RFROM
+        lcall SOURCESTORE
+        ljmp EXECUTE
 
 ;Z INTERPRET    i*x c-addr u -- j*x
 ;Z                         interpret given buffer
@@ -3579,7 +3350,7 @@ QUIT1:  lcall LIT
         jz QUIT2
         lcall XISQUOTE
         .db 2,"ok"
-        lcall ITYPE
+        lcall TYPE
 QUIT2:
         mov a,_TTH
         jnz QUIT1
@@ -3603,14 +3374,6 @@ FAULT:  lcall XISQUOTE
         .db 7,"error: "
         ljmp TYPE
         ljmp DOTX
-
-;C ABORT    i*x --   R: j*x --   clear stk & QUIT
-;   S0 SP!  QUIT ;
-        .drw link
-        .set link,*+1
-        .db 0,5,"ABORT"
-ABORT:  lcall TRUE
-        ljmp THROW
 
 ;C '    -- xt             find word in dictionary
 ;   BL WORD FIND
@@ -4204,7 +3967,7 @@ BSTORE:
         movx a,@dptr
         mov b,a
         mov a,#b
-        acall BSTORE_1
+        lcall BSTORE_1
         lcall DUP
         pop dpl
         pop dph
@@ -4366,7 +4129,6 @@ INITBLK:
         .drw    0               ; TTH
         .drw    0               ; >IN
         .drw    0,0             ; 'SOURCE
-        .drw    0               ; HP
         .drw    0               ; LP
         .drw    0               ; THISXT
         .drw    0               ; SOURCEID
@@ -4414,18 +4176,6 @@ sleepmode1:
         .set link,*+1
         .db 0,4,"COLD"
 COLD:
-        lcall XISQUOTE
-        .db 22
-        .drw 0,0,10,0   ; reserved,>IN,BASE,STATE
-        .drw dataram    ; DP
-        .drw 0,0        ; SOURCE init'd elsewhere
-        .drw lastword   ; LATEST
-        .drw 0,0        ; HP,LP init'd elsewhere
-        .drw 0          ; unused
-        lcall U0
-        lcall SWOP
-        lcall CMOVE
-
         lcall LIT
         .drw PHANTOM
         lcall LIT
@@ -4442,7 +4192,9 @@ COLD:
         lcall XISQUOTE
        .DB 35,"8051 CamelForth v1.6  18 Aug 1999"
        .DB 0x0d,0x0a
-        lcall ITYPE
+        lcall TYPE
+
+        mov _TTH,#0     ; always start up untethered
 
         mov r0,#S0
         ljmp QUIT

@@ -1,3 +1,5 @@
+: abort true throw ;
+
 : immediate 1 latest @ 1- c! ;
 : \ 0 parse 2drop ; immediate
 : ( ')' parse 2drop ; immediate
@@ -16,6 +18,9 @@
 
 : cells 2* ;
 : cell+ 2 + ;
+
+: decimal #10 base ! ;
+: hex     $10 base ! ;
 
 : bounds ( a n -- a+n a ) over + swap ;
 
@@ -43,11 +48,6 @@
     ['] (sliteral) compile,
     s,
 ; immediate
-
-: (.s)
-    depth if
-        >r recurse r> dup .
-    then ;
 
 create _ 80 allot  \ The "temporary buffer" in ANS: A.11.6.1.2165
 
@@ -106,13 +106,10 @@ create _ 80 allot  \ The "temporary buffer" in ANS: A.11.6.1.2165
 ;
 
 : evaluate
-    >in @ >r
-    source 2>r
-    source-id >r true 'source-id !
+    source>r
+    true 'source-id !
     interpret
-    r> 'source-id !
-    2r> r> source!
-;
+    r>source ;
 
 \ #######   DEFERRED WORDS    #################################
 
@@ -142,7 +139,6 @@ does> ( ... -- ... )
 then ; immediate
 
 include string0.fs
-include tools-ext.fs
 
 \ preserve DP, IDP, LATEST
 : marker
@@ -187,9 +183,89 @@ include value.fs
 \ From ANS specification A.6.2.0970
 : convert   1+ 511 >number drop ;
 
-include forth2012.fs
 include double0.fs
 include double.fs
 include exception.fs
 
-\ .( Forth system is ) ihere . .( bytes) cr
+( Pictured numeric output                    JCB 08:06 07/18/14)
+\ Adapted from hForth
+
+\ "The size of the pictured numeric output string buffer shall
+\ be at least (2*n) + 2 characters, where n is the number of
+\ bits in a cell."
+\
+\ The size of the region identified by WORD shall be at least
+\ 33 characters.
+
+create BUF0
+16 cells 2 + 33 max allot
+here constant BUF
+
+variable hld
+
+: <#
+    BUF hld !
+;
+
+: hold
+    -1 hld +! hld @ c!
+;
+
+: sign
+    0< if
+        [char] - hold
+    then
+;
+
+: #
+    0 base @ um/mod >r base @ um/mod swap
+    9 over < [ char A char 9 1 + - ] literal and +
+    [char] 0 + hold r>
+;
+
+: #s
+    begin
+        #
+        2dup d0=
+    until
+;
+
+: #>
+    2drop hld @ BUF over -
+;
+
+: d.r  ( d n -- )
+    >r
+    dup >r dabs <# #s r> sign #>
+    r> over - spaces type
+;
+
+: d.  ( d -- )
+    0 d.r space
+;
+
+: .  ( n -- )
+    s>d d.
+;
+
+: u.  ( u -- )
+    0 d.
+;
+
+: .r  ( n1 n2 -- )
+    >r s>d r> d.r
+;
+
+: u.r  ( u n -- )
+    0 swap d.r
+;
+
+include tools-ext.fs
+include forth2012.fs
+
+: new
+    s" | marker |" evaluate
+    ." Forth system is " ihere . ." bytes" cr
+;
+marker |
+\ #flash dump.bin

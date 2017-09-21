@@ -1,4 +1,5 @@
 import sys
+import array
 
 import emu8051
 from forthshell import ForthShell, main
@@ -51,6 +52,20 @@ class DUT(ForthShell):
     def command_response(self, cmd):
         self.uart_in = cmd + '\r\n'
         return self.frob()
+
+    cellsize = 2
+
+    def serialize(self):
+        l = self.command_response('$0 $8000 dump')
+        lines = l.strip().replace('\r', '').split('\n')
+        s = []
+        for l in lines:
+            l = l.split()
+            s += [int(b, 16) for b in l[1:17]]
+        s = array.array('B', s).tostring()
+        while s.endswith(256 * chr(0xff)):
+            s = s[:-256]
+        return array.array('h', s)
 
 if __name__ == '__main__':
     main(DUT)
