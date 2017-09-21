@@ -94,11 +94,12 @@
         .equ    _STATE  ,0x18   ; STATE
         .equ    _TTH    ,0x1a   ; TTH (tethered)
         .equ    _TOIN   ,0x1c   ; >IN
-        .equ    _SOURCE ,0x20   ; TICKSOURCE
-        .equ    _HP     ,0x24   ; HP
-        .equ    _LP     ,0x26   ; LP
-        .equ    _THISXT ,0x28   ; THISXT
-        .equ    _SRCID,  0x2a   ; 'SOURCE-ID
+        .equ    _SOURCE ,0x1e   ; TICKSOURCE
+        .equ    _HP     ,0x22   ; HP
+        .equ    _LP     ,0x24   ; LP
+        .equ    _THISXT ,0x26   ; THISXT
+        .equ    _SRCID,  0x28   ; 'SOURCE-ID
+        .equ    _FAULT,  0x2a   ; 'FAULT
 
         .equ    WORDBUF ,0x30   ; scratch for FIND
         .equ    RSP0    ,0x50   ; start of R stack
@@ -2136,6 +2137,13 @@ TICKSOURCE: lcall docon
 TICKSOURCEID: lcall docon
         .drw 0xff00 + _SRCID
 
+;Z 'FAULT
+        .drw link
+        .set link,*+1
+        .db  0,6,0x27,"FAULT"
+TICKFAULT: lcall docon
+        .drw 0xff00 + _FAULT
+
 ;Z LATEST    -- a-addr         last word in dict.
 ;   14 USER LATEST
         .drw link
@@ -2675,79 +2683,6 @@ PARSE:
         .drw 0x29
         lcall PARSE
         ljmp TYPE
-
-;Z (S")    -- c-addr u       run-time code for S"
-;   R@ I@                     get Data address
-;   R> CELL+ DUP IC@ CHAR+    -- Dadr Radr+2 n+1
-;   2DUP + ALIGNED >R         -- Dadr Iadr n+1
-;   >R OVER R> I>D            -- Dadr
-;   COUNT ;
-; Harvard model, for string stored in Code space
-; which is copied to Data space.
-        .drw link
-        .set link,*+1
-        .db 0,4,"(S",0x22,")"
-XSQUOTE: lcall RFETCH
-        lcall FETCH
-        lcall RFROM
-        inc dptr
-        inc dptr
-        lcall DUP
-        lcall CFETCH
-        inc dptr
-        lcall TWODUP
-        lcall PLUS
-        ; lcall ALIGNED
-        lcall TOR
-        lcall TOR
-        lcall OVER
-        lcall RFROM
-        lcall CMOVE
-        ljmp COUNT
-
-;C IS"      --            compile in-line string
-;   COMPILE (IS")  [ HEX ]
-;   22 IWORD
-;   IC@ 1+ ALIGNED IALLOT ; IMMEDIATE
-; Harvard model: string is stored in Code space
-        .drw link
-        .set link,*+1
-        .db IMMED,3,"IS",0x22
-ISQUOTE: lcall LIT
-        .drw XISQUOTE
-        lcall COMMAXT
-        lcall LIT
-        .drw 0x22
-        acall IWORD
-        lcall CFETCH
-        lcall ONEPLUS
-        ; lcall ALIGNED
-        ljmp IALLOT
-
-;C S"       --             compile in-line string
-;   COMPILE (S")  [ HEX ]
-;   HERE I,                     data address
-;   22 IWORD
-;   IC@ 1+ ALIGNED
-;   DUP ALLOT IALLOT ; IMMEDIATE
-; Harvard model: string is stored in Code space
-        .drw link
-        .set link,*+1
-        .db IMMED,2,"S",0x22
-SQUOTE: lcall LIT
-        .drw XSQUOTE
-        lcall COMMAXT
-        lcall HERE
-        lcall ICOMMA
-        lcall LIT
-        .drw 0x22
-        lcall IWORD
-        lcall CFETCH
-        lcall ONEPLUS
-        ; lcall ALIGNED
-        lcall DUP
-        lcall ALLOT
-        ljmp IALLOT
 
 ;Z ICOUNT  c-addr1 -- c-addr2 u  counted->adr/len
 ;   DUP CHAR+ SWAP IC@ ;          from Code space
@@ -3532,7 +3467,8 @@ DOUBLENUMBER:
         mov b,dpl                       ; double
         lcall DROP
         lcall NIP
-        lcall QERROR
+        lcall ZERONOTEQUAL
+        lcall THROW13
         lcall RFROM                     ;
         lcall QDNEGATE
         lcall DUP
@@ -3541,20 +3477,6 @@ DOUBLENUMBER:
         lcall QDUP
         lcall AND
         ret
-
-QERROR:
-        lcall zerosense
-        jz QERROR1
-        lcall ERROR
-        ljmp ABORT
-QERROR1:
-        ret
-
-; Write out the error string
-ERROR:
-        lcall XISQUOTE
-        .db 7,"error: "
-        ljmp TYPE
 
         .drw link
         .set link,*+1
@@ -3624,29 +3546,6 @@ INTER5:
 
 INTER9: ljmp DROP
 
-; ;C EVALUATE  i*x c-addr u -- j*x  interprt string
-; ;   'SOURCE 2@ >R >R  >IN @ >R
-; ;   INTERPRET
-; ;   R> >IN !  R> R> 'SOURCE 2! ;
-;         .drw link
-;         .set link,*+1
-;         .db 0,8,"EVALUATE"
-; EVALUATE: lcall TICKSOURCE
-;         lcall TWOFETCH
-;         lcall TOR
-;         lcall TOR
-;         lcall TOIN
-;         lcall FETCH
-;         lcall TOR
-;         acall INTERPRET
-;         lcall RFROM
-;         lcall TOIN
-;         lcall STORE
-;         lcall RFROM
-;         lcall RFROM
-;         lcall TICKSOURCE
-;         ljmp TWOSTORE
-
 ;C QUIT     --    R: i*x --    interpret from kbd
 ;   L0 LP !  R0 RP!   0 STATE !
 ;   BEGIN
@@ -3667,12 +3566,13 @@ QUIT:
         mov _SRCID+1,a
         mov _STATE,a
         mov _STATE+1,a
-QUIT1:  lcall TIB
-        lcall DUP
-        lcall TIBSIZE
-        lcall ACCEPT
-        lcall SPACE
-        acall INTERPRET
+QUIT1:  lcall LIT
+        .drw repl
+        lcall CATCH
+        lcall QDUP
+        lcall zerosense
+        jnz QUIT3
+
         lcall STATE
         lcall FETCH
         lcall ZEROEQUAL
@@ -3687,36 +3587,31 @@ QUIT2:
         lcall CR
         sjmp QUIT1
 
+QUIT3:
+        lcall TICKFAULT
+        lcall FETCH
+        lcall EXECUTE
+        sjmp QUIT
+
+repl:   lcall TIB
+        lcall DUP
+        lcall TIBSIZE
+        lcall ACCEPT
+        lcall SPACE
+        ljmp INTERPRET
+
+FAULT:  lcall XISQUOTE
+        .db 7,"error: "
+        ljmp TYPE
+        ljmp DOTX
+
 ;C ABORT    i*x --   R: j*x --   clear stk & QUIT
 ;   S0 SP!  QUIT ;
         .drw link
         .set link,*+1
         .db 0,5,"ABORT"
-ABORT:  mov r0,#S0
-        sjmp QUIT   ; QUIT never returns
-
-;Z ?ABORT   f c-addr u --       abort & print msg
-;   ROT IF ITYPE ABORT THEN 2DROP ;
-        .drw link
-        .set link,*+1
-        .db 0,6,"?ABORT"
-QABORT: lcall ROT
-        lcall zerosense
-        jz QABO1
-        lcall ITYPE
-        sjmp ABORT  ; ABORT never returns
-QABO1:  ljmp TWODROP
-
-;C ABORT"  i*x 0  -- i*x   R: j*x -- j*x  x1=0
-;C         i*x x1 --       R: j*x --      x1<>0
-;   POSTPONE IS" POSTPONE ?ABORT ; IMMEDIATE
-        .drw link
-        .set link,*+1
-        .db IMMED,6,"ABORT",0x22
-ABORTQUOTE: lcall ISQUOTE
-        lcall LIT
-        .drw QABORT
-        ljmp COMMAXT
+ABORT:  lcall TRUE
+        ljmp THROW
 
 ;C '    -- xt             find word in dictionary
 ;   BL WORD FIND
@@ -3727,51 +3622,13 @@ ABORTQUOTE: lcall ISQUOTE
 TICK:   lcall BL
         lcall XWORD
         lcall FIND
+WASFOUND:
         lcall ZEROEQUAL
-        lcall XISQUOTE
-        .db 1,"?"
-        sjmp QABORT
-
-;C CHAR   -- char           parse ASCII character
-;   BL WORD 1+ C@ ;
-        .drw link
-        .set link,*+1
-        .db 0,4,"CHAR"
-CHAR:   lcall BL
-        lcall XWORD
-        lcall ONEPLUS
-        ljmp CFETCH
-
-;C [CHAR]   --          compile character literal
-;   CHAR  ['] LIT ,XT  I, ; IMMEDIATE
-        .drw link
-        .set link,*+1
-        .db IMMED,6,"[CHAR]"
-BRACCHAR: acall CHAR
+THROW13:
         lcall LIT
-        .drw LIT
-        lcall COMMAXT
-        ljmp ICOMMA
-
-;C (    --                     skip input until )
-;   [ HEX ] 29 WORD DROP ; IMMEDIATE
-        .drw link
-        .set link,*+1
-        .db IMMED,1,"("
-PAREN:  lcall LIT
-        .drw 0x29
-        lcall XWORD
-        ljmp DROP
-
-;C \    --                     skip rest of line
-;   [ HEX ] 29 WORD DROP ; IMMEDIATE
-        .drw link
-        .set link,*+1
-        .db IMMED,1,"\\"
-BACKSLASH:  lcall LIT
-        .drw 0
-        lcall XWORD
-        ljmp DROP
+        .drw -13
+        lcall AND
+        ljmp THROW
 
 ; COMPILER ======================================
 
@@ -3894,19 +3751,6 @@ REVEAL: lcall LATEST
         lcall SWOP
         ljmp CSTORE
 
-;C IMMEDIATE   --   make last def'n immediate
-;   1 LATEST @ 1- IC! ;   set immediate flag
-; Harvard model.
-        .drw link
-        .set link,*+1
-        .db 0,9,"IMMEDIATE"
-IMMEDIATE: lcall LIT
-        .drw 0x1
-        lcall LATEST
-        lcall FETCH
-        lcall ONEMINUS
-        ljmp CSTORE
-
 ;C :        --           begin a colon definition
 ;   CREATE HIDE ] !COLON ;
         .drw link
@@ -3984,10 +3828,7 @@ POSTPONE: lcall BL
         lcall XWORD
         lcall FIND
         lcall DUP
-        lcall ZEROEQUAL
-        lcall XISQUOTE
-        .db 1,"?"
-        lcall QABORT
+        lcall WASFOUND
         lcall ZEROLESS
         lcall zerosense
         jz POST1
@@ -4528,6 +4369,9 @@ INITBLK:
         .drw    0,0             ; 'SOURCE
         .drw    0               ; HP
         .drw    0               ; LP
+        .drw    0               ; THISXT
+        .drw    0               ; SOURCEID
+        .drw    FAULT           ; 'FAULT
 
         .equ    INITBLKSIZE,*-INITBLK
 INITB:                          ; ( -- a u ) \ return init block
@@ -4600,7 +4444,9 @@ COLD:
        .DB 35,"8051 CamelForth v1.6  18 Aug 1999"
        .DB 0x0d,0x0a
         lcall ITYPE
-        ljmp ABORT       ; ABORT never returns
+
+        mov r0,#S0
+        ljmp QUIT
 
 CODEHERE:
 ; ===============================================

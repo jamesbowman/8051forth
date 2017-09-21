@@ -14,8 +14,8 @@ include coreplustest.fth
 include errorreport.fth
 include coreexttest.fth
 include doubletest.fth
+include exceptiontest.fth
 \ XX
-\ \ include exceptiontest.fth
 \ marker XX
 \ include facilitytest.fth
 \ XX

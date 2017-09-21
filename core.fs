@@ -1,3 +1,13 @@
+: immediate 1 latest @ 1- c! ;
+: \ 0 parse 2drop ; immediate
+: ( ')' parse 2drop ; immediate
+
+: char parse-name drop c@ ;
+
+: [char]
+    char postpone literal
+; immediate
+
 : align ;
 : aligned ;
 
@@ -180,5 +190,6 @@ include value.fs
 include forth2012.fs
 include double0.fs
 include double.fs
+include exception.fs
 
-\ .( Forth system is ) ihere . .( bytes) cr
+.( Forth system is ) ihere . .( bytes) cr
